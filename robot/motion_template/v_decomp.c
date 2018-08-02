@@ -1103,7 +1103,7 @@ int v_composition(v_wheel * v_wheels, int num_wheel, int ref_enc, v_chassis *out
 void data_w_log(v_wheel * v_wheels, int num_wheel)
 {
 	int i = 0;
-	char str[255] = { 0 };
+	char str[256] = { 0 };
 	double v_act = 0;
 	unsigned long time_stamp = 0;
 	int sdd_index = -1;

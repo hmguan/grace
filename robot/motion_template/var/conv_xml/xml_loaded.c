@@ -88,7 +88,7 @@ const char *get_first_text_properties(xmlAttr *attr) {
 
 int xml__read_data(const char *subdir, const char *file, const char *rootname, int( *handler)(xmlNodePtr element)) {
     
-    char xml_path[255];
+    char xml_path[256];
     xmlDocPtr doc;
     xmlNodePtr root = NULL;
     xmlNodePtr element = NULL;

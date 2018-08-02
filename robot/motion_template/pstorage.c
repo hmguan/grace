@@ -50,7 +50,7 @@ struct p_storage_t {
 static struct period_storage_data mapped_data = {.mptr = NULL, .mlen = 0 };
 
 int mm__load_mapping() {
-    char path[255];
+    char path[256];
     int retval;
     int fd;
 	struct stat st;
