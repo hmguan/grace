@@ -437,7 +437,7 @@ int nspi__on_allocate_navigation_task(HTCPLINK link, const char *data, int cb) {
             break;
         }
 
-        // dispatcher cannot cover navigation task befor cancel existing one
+        // dispatcher cannot cover navigation task before cancel existing one
         // also cannot cancel task when track status is in middle
         if (((nav->track_status_.response_ > kStatusDescribe_PendingFunction) &&
                 (nav->track_status_.response_ < kStatusDescribe_FinalFunction)) ||
@@ -1330,20 +1330,183 @@ void nspi__on_raise_segmentfault(HTCPLINK link) {
 #endif
 }
 
-//free heap memory when next incoming offline task  arrived
-//notify customer / rex navigation completed
-//decline post_navigation_task(not customer) / post_add_navigation_task_traj / post_allocate_operation_task when offline task is existed
-//decline offline task when either navigation task or operation task is existed
 static int nspi__on_allocate_offline_task(HTCPLINK link, const char *data, int cb) {
 	nsp__allocate_offline_task_t *pkt_offline_task = (nsp__allocate_offline_task_t *)data;
 	nsp__allocate_offline_task_ack_t ack_offline_task;
+	var__navigation_t *nav;
+	var__operation_t *opt;
 
 	memcpy(&ack_offline_task.head_, &pkt_offline_task->head_, sizeof(nsp__packet_head_t));
 	ack_offline_task.head_.type_ = PKTTYPE_ALLOC_OFFLINE_TASK_ACK;
 	ack_offline_task.head_.size_ = sizeof (ack_offline_task);
-	ack_offline_task.head_.err_ = var__set_offline_task(data, cb);
+
+	do {
+		nav = var__get_navigation();
+		if (nav) {
+			if (((nav->track_status_.response_ > kStatusDescribe_PendingFunction) && (nav->track_status_.response_ < kStatusDescribe_FinalFunction))
+				|| (nav->track_status_.middle_ != kStatusDescribe_Idle)
+				) { // 如果已经有非离线导航任务在执行，那么拒绝接受离线任务 
+				log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
+					"failed to allocate offline task, navigation status response=%u, middle=%u", \
+					nav->track_status_.response_, nav->track_status_.middle_);
+				ack_offline_task.head_.err_ = -EBUSY;
+				break;
+			}
+			var__release_object_reference(nav);
+		}
+		opt = var__get_opt();
+		if (opt) {
+			if (((opt->status_.response_ > kStatusDescribe_PendingFunction) && (opt->status_.response_ < kStatusDescribe_FinalFunction))
+				|| (opt->status_.middle_ != kStatusDescribe_Idle)
+				) { // 如果已经有非离线operation在执行，那么拒绝接受离线任务 
+				log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
+					"failed to allocate offline task, operation status response=%u, middle=%u", opt->status_.response_, opt->status_.middle_);
+				ack_offline_task.head_.err_ = -EBUSY;
+				break;
+			}
+			var__release_object_reference(opt);
+		}
+		// 设置新的离线任务对象 
+		ack_offline_task.head_.err_ = var__set_offline_task(data, cb);
+	} while (0);
 
 	return tcp_write(link, ack_offline_task.head_.size_, &nsp__packet_maker, &ack_offline_task);
+}
+
+static int nspi__on_cancel_offline_task(HTCPLINK link, const char *data, int cb) {
+	nsp__cancel_offline_task_t *pkt_cancel_offline_task = (nsp__cancel_offline_task_t *)data;
+	nsp__cancel_offline_task_t ack_cancel_offline_task;
+	var_offline_task_t *offline_task = NULL;
+
+	memcpy(&ack_cancel_offline_task, pkt_cancel_offline_task, sizeof(nsp__cancel_offline_task_t));
+	ack_cancel_offline_task.head_.type_ = PKTTYPE_CANCEL_OFFLINE_TASK_ACK;
+
+	offline_task = var__get_offline_task();
+	if (offline_task) {
+		if (offline_task->user_task_id_ != pkt_cancel_offline_task->task_id_) {
+			ack_cancel_offline_task.head_.err_ = -EEXIST;
+		} else {
+			// 直接设置离线任务状态未calcel，由customer取消正在执行的导航和operation后置为空闲状态 
+			var__xchange_command_status(&offline_task->track_status_, kStatusDescribe_Cancel, NULL);
+		}
+		var__release_object_reference(offline_task);
+	} else {
+		ack_cancel_offline_task.head_.err_ = -ENOENT;
+	}
+
+	return tcp_write(link, ack_cancel_offline_task.head_.size_, &nsp__packet_maker, &ack_cancel_offline_task);
+}
+
+static int nspi__on_offline_navigation_task(const var_offline_task_t *offline_task) {
+	var_offline_task_node_t *task_node = NULL;
+	trail_t *trail_array = NULL;
+	var__navigation_t *nav = NULL;
+	var__vehicle_t *veh = NULL;
+	int ret_value = 0;
+	char *tmp_data = (char *)&offline_task->tasks_[0];
+	int i, len = 0;
+
+	for (i = 0; i < offline_task->task_current_exec_index_; i++) {
+		task_node = (var_offline_task_node_t *)tmp_data;
+		len += sizeof(var_offline_task_node_t) - 1;
+		len += task_node->cnt_trals_ * sizeof(trail_t);
+		len += task_node->cnt_opers_ * sizeof(var_offline_oper_t);
+	}
+	tmp_data += len;
+	task_node = (var_offline_task_node_t *)tmp_data;
+	trail_array = (trail_t *)&task_node->data[0];
+
+	nav = var__get_navigation();
+	do {
+		if (!nav) {
+			log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout, "navigation object is not existed.");
+			ret_value = -ENOENT;
+			break;
+		}
+
+		// the new task id equal to current, request will be declined
+		if (task_node->task_id_ == nav->i.current_task_id_) {
+			log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
+				"offline navigation new task id equal to current."UINT64_STRFMT, nav->i.current_task_id_);
+			ret_value = -EINVAL;
+			break;
+		}
+
+		// dispatcher cannot cover navigation task before cancel existing one
+		// also cannot cancel task when track status is in middle
+		if (((nav->track_status_.response_ > kStatusDescribe_PendingFunction) &&
+			(nav->track_status_.response_ < kStatusDescribe_FinalFunction)) ||
+			(nav->track_status_.middle_ != kStatusDescribe_Idle)
+			) {
+			log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
+				"failed to allocate navigation task,status response=%u, middle=%u", nav->track_status_.response_, nav->track_status_.middle_);
+			ret_value = -EBUSY;
+			break;
+		}
+
+		nav->is_traj_whole_ = 1;
+		memcpy(&nav->dest_upl_, &task_node->dest_upl_, sizeof (task_node->dest_upl_));
+		memcpy(&nav->dest_pos_, &task_node->dest_pos_, sizeof (task_node->dest_pos_));
+
+		// release previous navigation trajectorys, reestablish the navigation sequence 
+		if (nav->traj_ref_.data_ && nav->traj_ref_.count_ > 0) {
+			free(nav->traj_ref_.data_);
+		}
+		nav->traj_ref_.count_ = 0;
+		nav->traj_ref_.data_ = NULL;
+
+		// protect the source request and count of trajs 
+		nav->traj_ref_.data_ = malloc(task_node->cnt_trals_ * sizeof (trail_t));
+		if (nav->traj_ref_.data_) {
+			nav->traj_ref_.count_ = task_node->cnt_trals_;
+			memcpy(nav->traj_ref_.data_, &trail_array, task_node->cnt_trals_ * sizeof (trail_t));
+			var__xchange_command_status(&nav->track_status_, kStatusDescribe_Startup, NULL);
+			nav->user_task_id_ = task_node->task_id_; // using the new task id
+			posix__atomic_inc(&nav->ato_task_id_); // atomic increase inner task id
+			log__save("motion_template", kLogLevel_Info, kLogTarget_Filesystem | kLogTarget_Stdout,
+				"successful allocate navigation task. user_id=%lld, ato_id=%lld", nav->user_task_id_, nav->ato_task_id_);
+		} else{
+			log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
+				"failed to allocate navigation task because insuffcient memory.");
+			ret_value = -ENOMEM;
+			break;
+		}
+
+		// change control mode to navigation
+		veh = var__get_vehicle();
+		if (veh) {
+			veh->control_mode_ = kVehicleControlMode_Navigation;
+			var__release_object_reference(veh);
+		}
+	} while (0);
+	if (nav) {
+		var__release_object_reference(nav);
+	}
+
+	return ret_value;
+}
+
+static int nspi__on_offline_next_step(HTCPLINK link, const char *data, int cb) {
+	nsp__cancel_offline_task_t *pkt_cancel_offline_task = (nsp__cancel_offline_task_t *)data;
+	nsp__cancel_offline_task_t ack_cancel_offline_task;
+	var_offline_task_t *offline_task = NULL;
+
+	memcpy(&ack_cancel_offline_task, pkt_cancel_offline_task, sizeof(nsp__cancel_offline_task_t));
+	ack_cancel_offline_task.head_.type_ = PKTTYPE_CANCEL_OFFLINE_TASK_ACK;
+
+	offline_task = var__get_offline_task();
+	if (offline_task) {
+		if (offline_task->track_status_.command_ == kStatusDescribe_Idle) {
+			var__xchange_command_status(&offline_task->track_status_, kStatusDescribe_Startup, NULL);
+		}
+		ack_cancel_offline_task.head_.err_ = nspi__on_offline_navigation_task(offline_task);
+		offline_task->task_current_exec_index_ += 1;
+		var__release_object_reference(offline_task);
+	} else {
+		ack_cancel_offline_task.head_.err_ = -ENOENT;
+	}
+
+	return tcp_write(link, ack_cancel_offline_task.head_.size_, &nsp__packet_maker, &ack_cancel_offline_task);
 }
 
 static
@@ -1473,9 +1636,12 @@ int nsp__on_tcp_recvdata(HTCPLINK link, const char *data, int cb) {
             break;
 
 		case PKTTYPE_ALLOC_OFFLINE_TASK:
+			retval = nspi__on_allocate_offline_task(link, data, cb);
+			break;
 		case PKTTYPE_CANCEL_OFFLINE_TASK:
+			retval = nspi__on_cancel_offline_task(link, data, cb);
 		case PKTTYPE_OFFLINE_NEXT_STEP:
-			nspi__on_allocate_offline_task(link, data, cb);
+			retval = nspi__on_offline_next_step(link, data, cb);
 			break;
 
         default:
