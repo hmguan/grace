@@ -42,11 +42,6 @@ typedef struct var_offline_task {
 	var_offline_task_node_t tasks_[1];
 } var_offline_task_t;
 
-//free heap memory when next incoming offline task  arrived
-//notify customer / rex navigation completed
-//decline post_navigation_task(not customer) / post_add_navigation_task_traj / post_allocate_operation_task when offline task is existed
-//decline offline task when either navigation task or operation task is existed
-
 extern var_offline_task_t *var__get_offline_task();
 extern int var__set_offline_task(const char *data, int cb);
 

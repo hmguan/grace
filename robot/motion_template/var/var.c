@@ -262,6 +262,23 @@ void var__insert_object(var__functional_object_t *ob) {
     posix__pthread_mutex_unlock(&__var__kernal_manager.mutex_);
 }
 
+void var__delete_object(var__functional_object_t *ob) {
+
+	posix__pthread_mutex_lock(&__var__kernal_manager.mutex_);
+
+	/* 从全局对象表删除 */
+	__list_del_entry(&ob->global_);
+
+	/* 为全局对象表建立快速索引, 此处硬性限制了最大对象ID（总数）不得超过 MAXIMUM_OBJECT_INDEX */
+	if (ob->object_id_ < MAXIMUM_OBJECT_INDEX) {
+		__var__kernal_manager.hld_mapping_[ob->object_id_] = -1;
+	}
+
+	/* 记录全局对象个数 */
+	--__var__kernal_manager.actived_object_count_;
+	posix__pthread_mutex_unlock(&__var__kernal_manager.mutex_);
+}
+
 objhld_t var__getobj_handle_byid(int object_id) {
     objhld_t hld;
 

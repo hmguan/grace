@@ -104,6 +104,11 @@ int var__traversal_global_object_ids(int (*todo)(int fixed_object_id, void *, in
 extern
 void var__insert_object(var__functional_object_t *ob);
 
+/*从全局管理队列删除一个对象
+*/
+extern
+void var__delete_object(var__functional_object_t *ob);
+
 /* 根据对象ID, 快速索引对象句柄
  */
 extern
