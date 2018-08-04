@@ -423,23 +423,18 @@ void var__convert_by_mapping() {
         return;
     }   
 
-    if (var__query_global_object_ids(varcnt, varids) < 0) {
-        free(varids);
-        return;
-    }
-
-    for (i = 0; i < varcnt; i++) {
-        hld = var__getobj_handle_byid(varids[i]);
-        if (hld >= 0) {
-            obj = (var__functional_object_t *) objrefr(hld);
-            if (obj) {
-                p_var = (char *) obj->body_;
-                mm__get_calibration(obj->object_id_, p_var);
-                objdefr(hld);
+    if (var__query_global_object_ids(varcnt, varids) >= 0) {
+        for (i = 0; i < varcnt; i++) {
+            hld = var__getobj_handle_byid(varids[i]);
+            if (hld >= 0) {
+                obj = (var__functional_object_t *) objrefr(hld);
+                if (obj) {
+                    p_var = (char *) obj->body_;
+                    mm__get_calibration(obj->object_id_, p_var);
+                    objdefr(hld);
+                }
             }
         }
-        
     }
-
     free(varids);
 }
