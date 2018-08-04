@@ -87,7 +87,7 @@ std::string convert_positive(const std::string& str, const char preview_cr, cons
 static int tar_cmd_exec(std::string cmd_str)
 {
 	int ret = system(cmd_str.c_str());
-	if (ret) {
+	if (-1 != ret && ret != 0) {
 		loerror("agv_shell") << "create tar file error:" << ret << " cmd:" << cmd_str.substr(0, 1024);
 		return -EIO;
 	}
@@ -120,8 +120,8 @@ static int set_cmd_str_head(
 				return ret;
 			}
 		}
-		// example: "cd /gzrobot/; tar -rf log_12345678.tar "
-		cmd_str = "cd " + path_new + "; tar -rf " + compressed_file_name + " ";
+		// example: "cd /gzrobot/; tar --warning=no-file-changed -rf log_12345678.tar "
+		cmd_str = "cd " + path_new + "; tar --warning=no-file-changed -rf " + compressed_file_name + " ";
 		path_old = path_new;
 	}
 	return 0;
@@ -140,9 +140,9 @@ static int check_cmd_length(
 			return ret;
 		}
 		if (path_new.empty()) {
-			cmd_str = "tar -rf " + compressed_file_name + " ";
+			cmd_str = "tar --warning=no-file-changed -rf " + compressed_file_name + " ";
 		} else {
-			cmd_str = "cd " + path_new + "; tar -rf " + compressed_file_name + " ";
+			cmd_str = "cd " + path_new + "; tar --warning=no-file-changed -rf " + compressed_file_name + " ";
 		}
 	}
 	return 0;
@@ -166,7 +166,7 @@ int compress_files(const std::vector<std::string>& files, std::string& compresse
 	std::string path_new;
 	std::string file_name;
 	int need_run = 0;
-	std::string cmd_str = "tar -rf " + compressed_file_name + " ";
+	std::string cmd_str = "tar --warning=no-file-changed -rf " + compressed_file_name + " ";
 	for (size_t i = 0; i < files.size(); i++) {
 		file_name = files[i];
 		// file_name:"/dir1/dir2/agv_shell/log/nshost_20180724_084756.log"

@@ -443,23 +443,24 @@ void agv_shell_session::begin_upgrade(const std::shared_ptr<nsp::proto::proto_ms
     
 	int ret = -1;
 	loinfo("agv_shell") << "graceup thread start ...";
-	try {
+	//try {
 		// execute upgrade script(graceup.sh)
-		std::thread th_run_script(run_process_by_popen, (void*)update_file_path.c_str(), (void*)NULL);
-		th_run_script.detach();
-		ret = 0;
-	} catch (...) {
-		loerror("agv_shell") << "start graceup thread failure!!!";
-		ret = -1;
-	}
+		//std::thread th_run_script(run_process_by_popen, (void*)update_file_path.c_str(), (void*)NULL);
+		//th_run_script.detach();
+		//ret = 0;
+	//} catch (...) {
+		//loerror("agv_shell") << "start graceup thread failure!!!";
+		//ret = -1;
+	//}
 
 	nsp::toolkit::singleton<file_manager>::instance()->release_upgrade();
 	pkt.err_ = ret;
 	psend(&pkt);
-	if (ret >= 0) {
-		loinfo("agv_shell") << "graceup thread start successful, agv_shell will exit...";
-	}
-	//os will be reboot in upgrade script.
+	//close and restart
+	loinfo("agv_shell") << "graceup thread start successful, agv_shell will exit...";
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	reboot_os();
+
 #endif
 }
 
