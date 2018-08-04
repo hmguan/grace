@@ -80,9 +80,14 @@ int nspi__calibate_byid(HTCPLINK link, const char *data, int cb) {
     int usable;
     int retval;
     enum nsp__controlor_type_t nct;
+    int mm_size;
+    objhld_t hld;
+    var__functional_object_t *obj;
+    char *p_var;
 
     usable = cb;
     retval = 0;
+    mm_size = -1;
 
     /* build a acknowledge packet */
     memcpy(&ack_common_calibate, &pkt_common_calibate->head_, sizeof ( nsp__packet_head_t));
@@ -119,6 +124,68 @@ int nspi__calibate_byid(HTCPLINK link, const char *data, int cb) {
                 log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout, "invalid common write byid request size");
                 retval = -EFAULT;
                 break;
+            }
+
+            hld = var__getobj_handle_byid(item->var_id_);
+            if (hld > 0) {
+                obj = (var__functional_object_t *) objrefr(hld);
+                if (obj) {
+                    p_var = (char *) obj->body_;
+
+                    var__acquire_lock(obj);
+
+                    // protect memory access fatal
+                    if (item->offset_ + item->length_ > obj->body_length_) {
+                        log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
+                            "common calibate by id request memory error, offset=%u, length=%u, ID=%u", item->offset_, item->length_, item->var_id_);
+                        ack_common_calibate.err_ = -1;
+                    } else {
+                        /* save data in mapped memory, determine size by type */
+                        switch(obj->type_) {
+                            case kVarType_Vehicle:
+                                mm_size = sizeof(struct var__vehicle_config_t);
+                                break;
+                            case kVarType_Navigation:
+                                mm_size = sizeof(struct var__navigation_config_t);
+                                break;
+                            case kVarType_SWheel:
+                                mm_size = sizeof(struct var__swheel_config_t);
+                                break;
+                            case kVarType_DWheel:
+                                mm_size = sizeof(struct var__dwheel_config_t);
+                                break;
+                            case kVarType_SDDExtra:
+                                mm_size = sizeof(struct __var__sdd_extra);
+                                break;
+                            case kVarType_DriveUnit:
+                                mm_size = sizeof(struct var__driveunit_config_t);
+                                break;
+                            default:
+                                retval = -1;
+                                mm_size = -1;
+                                break;
+                        }
+
+                        if (mm_size > 0) {
+                            /* copy data to var memory */
+                            memcpy(p_var + item->offset_, item->data_, item->length_);
+                            /* copy data to mapped memory */
+                            mm__set_calibration(obj->object_id_, mm_size, p_var);
+                        }
+                    }
+
+                    var__release_lock(obj);
+                    objdefr(hld);
+
+                    /* no matter which step of security check failed, 
+                        subsequent requests are no longer executed */
+                    if (ack_common_calibate.err_ < 0) {
+                        break;
+                    }
+
+                    p_var = NULL;
+                    hld = -1;
+                }
             }
 
             item = (nsp__common_protocol_item_t *) (((char *) item) + (sizeof ( nsp__common_protocol_item_t) + item->length_));
@@ -1404,7 +1471,7 @@ int nspi__on_localization_cfgread(HTCPLINK link, const char *data, int cb) {
             "illegal controlor type:0x%08X try method nspi__on_localization_cfgread", nct);
         retval = -EBADF;
     } else {
-        retval = mm__getloc(ack.blob_);
+        retval = mm__getloc(ack.blob_, sizeof(ack.blob_));
     }
 
     ack.head_.id_ = request->id_;
@@ -1429,7 +1496,7 @@ int nspi__on_localization_cfgwrite(HTCPLINK link, const char *data, int cb) {
             "illegal controlor type:0x%08X try method nspi__on_localization_cfgread", nct);
         retval = -EBADF;
     } else {
-        retval = mm__setloc(request->blob_);
+        retval = mm__setloc(request->blob_, sizeof(request->blob_));
     }
 
     ack.id_ = request->head_.id_;

@@ -151,5 +151,10 @@ void var__commit_status_describe_dup(var__status_describe_t *ori, const var__sta
 extern
 void var__init_status_describe(var__status_describe_t *sd);
 
+/* convert configure by mmap
+*/
+extern
+void var__convert_by_mapping();
+
 
 #endif

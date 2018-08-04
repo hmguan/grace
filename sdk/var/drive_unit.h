@@ -20,6 +20,12 @@ typedef struct _ASSOICATED {
     struct list_head link_;
 } associated_object_t;
 
+struct var__driveunit_config_t {
+    /*+000*/ enum drive_unit_type_t unit_type_; // 驱动单元的类型[]
+    /*+004*/ position_t install_; // 安装位置
+    /*+028*/ position_t calibrated_; // 经过校准的安装位置
+};
+
 typedef struct _var__drive_unit {
     /*+000*/ enum drive_unit_type_t unit_type_; // 驱动单元的类型[]
     /*+004*/ position_t install_; // 安装位置

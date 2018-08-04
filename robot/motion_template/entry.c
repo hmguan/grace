@@ -34,6 +34,8 @@
 
 #include "pstorage.h"
 
+#include "wheel.h"
+
 #pragma pack(push, 1)
 
 typedef struct {
@@ -346,6 +348,18 @@ void mtecr(const char *host_event, const char *reserved, int rescb) {
     }
 }
 
+#pragma pack(push, 1)
+
+struct mm {
+    int a;
+    int b;
+    int c;
+    double x;
+    float y;
+};
+
+#pragma pack(pop)
+
 int main(int argc, char **argv) {
     var__error_handler_t *err;
     int navigation_timeout_as_fatal;
@@ -417,38 +431,10 @@ int main(int argc, char **argv) {
     navigation_timeout_as_fatal = err->navigation_timeout_as_fatal_;
     var__release_object_reference(err);
 
+    /* var loaded */
     var__load_dev_configure();
     var__load_var_configure();
     mnt__load_setting();
-
-#ifndef _WIN32
-    nis_checr(&mtecr);
-#endif
-
-    tcp_init();
-    udp_init();
-    if (nsp__init_network() < 0) {
-        log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout, "failed to startup network service.");
-        return 1;
-    }
-
-    /* need to create communication with VCU module while under arm environment */
-#if !_WIN32
-    nsp__init_gzd_object();
-	nspi__init_regist_cycle_event();
-#endif
-
-    posix__pthread_create(&navigation_tp, &run__navigation_proc, &monitor);
-
-    /* create thread for runtime safty */
-    if (safety__init() >= 0) {
-        posix__pthread_create(&safty_tp, &run__safety_proc, NULL);
-    } else {
-        log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout, "failed to init safety thread.");
-    }
-
-    /* create thread for guard and error detect */
-    posix__pthread_create(&guard_tp, &run__guard_proc, NULL);
 
     /* zeroization save object */
     p_storage_retval = mm__load_mapping();
@@ -467,6 +453,40 @@ int main(int argc, char **argv) {
     } else {
         log__save("motion_template", kLogLevel_Warning, kLogTarget_Filesystem | kLogTarget_Stdout, "failed load file mapping for UPL.");
     }
+
+    /* var adjust by mapped memory */
+    var__convert_by_mapping();
+
+#ifndef _WIN32
+    nis_checr(&mtecr);
+#endif
+
+    /* network startup */
+    tcp_init();
+    udp_init();
+    if (nsp__init_network() < 0) {
+        log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout, "failed to startup network service.");
+        return 1;
+    }
+
+    /* need to create communication with VCU module while under arm environment */
+#if !_WIN32
+    nsp__init_gzd_object();
+	nspi__init_regist_cycle_event();
+#endif
+
+    /* navigation thread startup */
+    posix__pthread_create(&navigation_tp, &run__navigation_proc, &monitor);
+
+    /* create thread for runtime safty */
+    if (safety__init() >= 0) {
+        posix__pthread_create(&safty_tp, &run__safety_proc, NULL);
+    } else {
+        log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout, "failed to init safety thread.");
+    }
+
+    /* create thread for guard and error detect */
+    posix__pthread_create(&guard_tp, &run__guard_proc, NULL);
 
     while (1) {
         retval = posix__waitfor_waitable_handle(&monitor, (uint32_t) navigation_timeout_as_fatal);

@@ -27,6 +27,22 @@ enum vehicle_control_mode_t {
 
 #pragma pack(push, 1)
 
+struct var__vehicle_config_t {
+    /*+000*/ int vehicle_id_; // 机器人ID
+    /*+004*/ char vehicle_name_[VAR_NAME_LENGTH]; // 机器人名字
+    /*+004*/ enum vehicle_type_t vehicle_type_; // 车辆类型
+    /*+012*/ char chassis_type_; // 底盘类型, 0位表示能否旋转， 1位表示能否平移
+    /*+013*/ double max_speed_; // 底盘最大速度
+    /*+021*/ double creep_speed_; // 底盘最小速度（龟速)
+    /*+029*/ double max_acc_; // 底盘最大加速度
+    /*+037*/ double max_dec_; // 底盘最大减速度
+    /*+045*/ double max_w_; // 最大角速度
+    /*+053*/ double creep_w_; // 最小角速度（龟速）
+    /*+061*/ double max_acc_w_; // 最大角加速度(需要约定单位, 弧度)
+    /*+069*/ double max_dec_w_; // 最大角减速度       
+    /*+077*/ double steer_angle_error_tolerance_; // 转向轮角度偏差容忍值
+};
+
 typedef struct _var__vehicle_t {
     // 全局只读
     /*+000*/ int vehicle_id_; // 机器人ID

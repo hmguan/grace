@@ -19,6 +19,7 @@
 #include "posix_string.h"
 #include "posix_thread.h"
 #include "posix_atomic.h"
+#include "pstorage.h"
 
 typedef int( *config_proc_t)();
 
@@ -403,4 +404,42 @@ void var__init_status_describe(var__status_describe_t *sd) {
     if (sd) {
         sd->command_ = sd->middle_ = sd->response_ = kStatusDescribe_Idle;
     }
+}
+
+void var__convert_by_mapping() {
+    int varcnt;
+    int i;
+    int *varids;
+    objhld_t hld;
+    char *p_var;
+    var__functional_object_t *obj;
+
+    varcnt = var__query_global_count();
+    if (varcnt <= 0) {
+        return;
+    }
+
+    if (NULL == (varids = (int *)malloc(varcnt * sizeof(int)))) {
+        return;
+    }   
+
+    if (var__query_global_object_ids(varcnt, varids) < 0) {
+        free(varids);
+        return;
+    }
+
+    for (i = 0; i < varcnt; i++) {
+        hld = var__getobj_handle_byid(varids[i]);
+        if (hld >= 0) {
+            obj = (var__functional_object_t *) objrefr(hld);
+            if (obj) {
+                p_var = (char *) obj->body_;
+                mm__get_calibration(obj->object_id_, p_var);
+                objdefr(hld);
+            }
+        }
+        
+    }
+
+    free(varids);
 }

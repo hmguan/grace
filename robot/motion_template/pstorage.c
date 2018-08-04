@@ -5,21 +5,22 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <errno.h>
 
 #include "logger.h"
 #include "posix_ifos.h"
-#include "posix_string.h"
-#include "posix_thread.h"
 #include "posix_time.h"
+#include "posix_string.h"
 
 #include "vartypes.h"
+#include "navigation.h"
+#include "vehicle.h"
+#include "drive_unit.h"
+#include "wheel.h"
 
 #if !defined P_STORAGE_FILE_SIZE
-#define P_STORAGE_FILE_SIZE     (256)
-#endif
-
-#if !defined P_STORAGE_LOC_CONFIG
-#define P_STORAGE_LOC_CONFIG    (128)
+#define P_STORAGE_FILE_SIZE     (8192)
 #endif
 
 #pragma pack(push,1)
@@ -29,14 +30,35 @@ struct period_storage_data {
 	uint32_t mlen;
 };
 
+struct p_storage_formt {
+    upl_t upl;
+    double last_total_odo;
+};
+
+struct p_storage_calibration_node {
+    int len;  /* total length of this node, include user data size and size of node struct */
+    int id;
+    unsigned char data[0];
+};
+
+struct p_storage_calibration_describe {
+    /* by initialize, this value is zero */
+    int count;
+
+    /* tail means length of head to last node's last data byte.
+        so, new node insert into queue should use tail as it's begin offset */
+    int tail;
+
+    /* head pointer of the var list */
+    struct p_storage_calibration_node head[0];
+};
+
 struct p_storage_t {
     union {
         struct {
-            upl_t upl;
-            double last_total_odo;
-
-            /* misc of localization program configures */
-            unsigned char loc_config[P_STORAGE_LOC_CONFIG];
+            unsigned char formt[1024];
+            unsigned char forloc[1024];
+            unsigned char forcab[4096];
         }p_storage_feild;
 
         unsigned char p_storage_occupy[P_STORAGE_FILE_SIZE];
@@ -47,6 +69,7 @@ struct p_storage_t {
 
 #define RECORD_DATA_FILE "record.dat"
 
+static pthread_mutex_t lock_calibration = PTHREAD_MUTEX_INITIALIZER;
 static struct period_storage_data mapped_data = {.mptr = NULL, .mlen = 0 };
 
 int mm__load_mapping() {
@@ -124,36 +147,203 @@ void mm__release_mapping() {
 	}
 }
 
-int mm__write_mapping(uint32_t len, const void *data) {
-	if (!mapped_data.mptr || (mapped_data.mlen <= 0) || !data) {
-		return -EINVAL;
-	}
-	
-	memcpy(mapped_data.mptr, data, len);
-	return 0;
-}
-
-int mm__read_mapping(uint32_t offset, uint32_t len, void *data) {
-	if (!mapped_data.mptr || (mapped_data.mlen <= 0) || (offset + len > mapped_data.mlen) || !data) {
-		return -EINVAL;
-	}
-	
-	memcpy(data, mapped_data.mptr + offset, len);
-	return 0;
-}
-
 int mm__getupl(void *upl) {
-    return mm__read_mapping(0, sizeof(upl_t), upl);
+    struct p_storage_formt *formt;
+    struct p_storage_t *pmap;
+
+    if (!mapped_data.mptr || 0 == mapped_data.mlen) {
+        return -EINVAL;
+    }
+
+    pmap = (struct p_storage_t *)mapped_data.mptr;
+    formt = (struct p_storage_formt *)&pmap->p_storage_feild.formt[0];
+
+    memcpy(upl, &formt->upl, sizeof(formt->upl));
+    return 0;
 }
 
 int mm__setupl(const void *upl) {
-    return mm__write_mapping(sizeof(upl_t), upl);
+    struct p_storage_formt *formt;
+    struct p_storage_t *pmap;
+
+    if (!mapped_data.mptr || 0 == mapped_data.mlen) {
+        return -EINVAL;
+    }
+
+    pmap = (struct p_storage_t *)mapped_data.mptr;
+    formt = (struct p_storage_formt *)&pmap->p_storage_feild.formt[0];
+
+    memcpy(&formt->upl, upl, sizeof(formt->upl));
+    return 0;
 }
 
-int mm__getloc(void *loc){
-    return mm__read_mapping(0, P_STORAGE_LOC_CONFIG, loc);
+int mm__getloc(void *loc, int cb) {
+    unsigned char *forloc;
+    struct p_storage_t *pmap;
+
+    if (!mapped_data.mptr || 0 == mapped_data.mlen) {
+        return -EINVAL;
+    }
+
+    pmap = (struct p_storage_t *)mapped_data.mptr;
+    forloc = &pmap->p_storage_feild.forloc[0];
+
+    memcpy(loc, forloc, cb);
+    return 0;
 }
 
-int mm__setloc(const void *loc) {
-    return mm__write_mapping(P_STORAGE_LOC_CONFIG, loc);
+int mm__setloc(const void *loc, int cb) {
+    unsigned char *forloc;
+    struct p_storage_t *pmap;
+
+    if (!mapped_data.mptr || 0 == mapped_data.mlen) {
+        return -EINVAL;
+    }
+
+    pmap = (struct p_storage_t *)mapped_data.mptr;
+    forloc = &pmap->p_storage_feild.forloc[0];
+
+    memcpy(forloc, loc, cb);
+    return 0;
+}
+
+static
+int mm__insert_calibration_node(struct p_storage_calibration_describe *p_calibration_desc, int varid, int cb, const void *data) {
+    struct p_storage_calibration_node *node, *tail;
+    unsigned char *p;
+    int nodecb;
+
+    if (!p_calibration_desc || !data || cb <= 0) {
+        return -EINVAL;
+    }
+
+    nodecb = cb + sizeof(struct p_storage_calibration_node);
+    if (NULL == (node = (struct p_storage_calibration_node *)malloc(nodecb))) {
+        return -ENOMEM;
+    }
+
+    pthread_mutex_lock(&lock_calibration);
+
+    p = (unsigned char *)p_calibration_desc->head;
+
+    /* current tail is the previous node of @node */
+    p += p_calibration_desc->tail;
+    tail = (struct p_storage_calibration_node *)p;
+    
+    /* build user data */
+    node->len = nodecb;
+    node->id = varid;
+    memcpy(node->data, data, cb);
+
+    /* copy node to the mapped pages */
+    memcpy(tail, node, nodecb );
+
+    /* move tail pointer */
+    p_calibration_desc->tail += node->len;
+
+    /* increase the total count of nodes */
+    ++p_calibration_desc->count;
+        
+    pthread_mutex_unlock(&lock_calibration);
+    free(node);
+
+    return 0;
+}
+
+static
+int mm__update_calibration_bysearch(struct p_storage_calibration_describe *p_calibration_desc, int varid,int cb, const void *data) {
+    struct p_storage_calibration_node *cursor;
+    int retval;
+    int i;
+
+    if (!p_calibration_desc || !data || cb <= 0) {
+        return -EINVAL;
+    }
+
+    cursor = p_calibration_desc->head;
+    retval = -1;
+
+    pthread_mutex_lock(&lock_calibration);
+
+    /* search the object which specified by varid and type */
+    for (i = 0; i < p_calibration_desc->count; i++) {
+        if (
+            cursor->id == varid &&
+             ((cursor->len - sizeof(struct p_storage_calibration_node)) == cb))
+        {
+            log__save("motion_template", kLogLevel_Info, kLogTarget_Filesystem | kLogTarget_Stdout,"pstorage recored calibration var %d.", varid);
+            memcpy(cursor->data, data, cb);
+            retval = 0;
+            break;
+        }
+
+        cursor = (struct p_storage_calibration_node *)((unsigned char *)cursor + cursor->len);
+    }
+    pthread_mutex_unlock(&lock_calibration);
+
+    return retval;
+}
+
+static
+int mm__load_calibration_bysearch(struct p_storage_calibration_describe *p_calibration_desc, int varid, void *data) {
+    struct p_storage_calibration_node *cursor;
+    int retval;
+    int i;
+
+    if (!p_calibration_desc || !data ) {
+        return -EINVAL;
+    }
+
+    cursor = p_calibration_desc->head;
+    retval = -1;
+
+    pthread_mutex_lock(&lock_calibration);
+
+    /* search the object which specified by varid and type */
+    for (i = 0; i < p_calibration_desc->count; i++) {
+        if ( cursor->id == varid ) {
+            log__save("motion_template", kLogLevel_Info, kLogTarget_Filesystem | kLogTarget_Stdout,"pstorage load calibration var %d.", varid);
+            memcpy(data, cursor->data, cursor->len - sizeof(struct p_storage_calibration_node));
+            retval = 0;
+            break;
+        }
+
+        cursor = (struct p_storage_calibration_node *)((unsigned char *)cursor + cursor->len);
+    }
+    pthread_mutex_unlock(&lock_calibration);
+
+    return retval;
+}
+
+int mm__set_calibration(int varid, int cb, const void *data) {
+    struct p_storage_calibration_describe *p_calibration_desc;
+    struct p_storage_t *pmap;
+
+    if (!mapped_data.mptr || 0 == mapped_data.mlen || !data || cb <= 0) {
+        return -EINVAL;
+    }
+
+    pmap = (struct p_storage_t *)mapped_data.mptr;
+    p_calibration_desc = (struct p_storage_calibration_describe *)&pmap->p_storage_feild.forcab[0];
+
+    if (mm__update_calibration_bysearch(p_calibration_desc, varid, cb ,data) < 0) {
+        /* object no found, add it, insert to mapping file */
+        return mm__insert_calibration_node(p_calibration_desc, varid, cb, data);
+    }
+
+    return 0;
+}
+
+int mm__get_calibration(int varid, void *data) {
+        struct p_storage_calibration_describe *p_calibration_desc;
+    struct p_storage_t *pmap;
+
+    if (!mapped_data.mptr || 0 == mapped_data.mlen || !data) {
+        return -EINVAL;
+    }
+
+    pmap = (struct p_storage_t *)mapped_data.mptr;
+    p_calibration_desc = (struct p_storage_calibration_describe *)&pmap->p_storage_feild.forcab[0];
+
+    return mm__load_calibration_bysearch(p_calibration_desc, varid, data);
 }

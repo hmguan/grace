@@ -140,7 +140,7 @@ typedef struct _POSITION {
 } position_t, velocity_t;
 
 /* upl_t 结构 */
-typedef struct _UPL {
+typedef struct _unique_position_on_line {
     int edge_id_;
     double percentage_;
 

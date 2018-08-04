@@ -12,6 +12,39 @@ typedef struct _trail {
     int wop_id_;
 } trail_t;
 
+struct var__navigation_config_t {
+    double max_speed_; // 导航最大速度
+    double creep_speed_; // 导航龟速,当距离目标点creep_distance时，发送龟速
+    double max_w_; // 导航最大角速度
+    double creep_w_; // 导航龟角速度
+    double slow_down_speed_; // 慢速,当nav.slow_down被置位时的速度限制
+    double acc_; // 导航加速度
+    double dec_; // 导航减速度
+    double dec_estop_; // 急停减速度,在急停时导航的减速度
+    double acc_w_; // 最大角加速度
+    double dec_w_; // 最大角减速度
+    double creep_distance_; // 在离目标多远时发龟速
+    double creep_theta_; // 在离目标角度多少度时发龟角速度
+    double upl_mapping_angle_tolerance_; // 路径映射角度容忍偏差,用于计算当前的定位坐标属于哪一条边
+    double upl_mapping_dist_tolerance_; // 路径映射距离容忍偏差
+    double upl_mapping_angle_weight_; // 路径映射角度权重
+    double upl_mapping_dist_weight_; // 路径映射角度权重
+    double tracking_error_tolerance_dist_; // 导航轨迹跟踪的距离偏差容忍值
+    double tracking_error_tolerance_angle_; // 导航轨迹跟踪的角度偏差容忍值
+    double aim_dist_; // 预瞄距离
+    float  predict_time_; // 预测时间(秒)
+    uint32_t is_traj_whole_; // 路径是否完整,0不允许导航真正完成, 1允许完成(POC后， 这个字段将被独立出来)
+    double aim_angle_p_; // 预瞄角度偏差的PID参数
+    double aim_angle_i_;
+    double aim_angle_d_;
+    double stop_tolerance_; // 停止距离,当距离目标点多远的时候发送速度0
+    double stop_tolerance_angle_; // 角度上的停止阈值
+    double stop_point_trim_; // 停止点调整,对停止点进行前后修正的值，即改变目标点
+    double aim_ey_p_; // 侧向偏差的PID参数
+    double aim_ey_i_;
+    double aim_ey_d_;
+};
+
 typedef struct _var__navigation_t {
     // 全局只读
     double max_speed_; // 导航最大速度

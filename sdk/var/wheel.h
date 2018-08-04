@@ -19,6 +19,20 @@ enum dwheel_ctrlmod_t {
 
 #pragma pack (push, 1)
 
+struct var__swheel_config_t {
+    /*+000*/ double min_angle_; // 行驶的最小角度         rad
+    /*+008*/ double max_angle_; // 最大角度            rad
+    /*+016*/ double zero_angle_; // 零偏                     rad
+    /*+024*/ int64_t zero_angle_enc_; // 零偏对应的反馈编码值        counts
+    /*+032*/ double max_w_; // 最大角速度                     rad/s
+    /*+040*/ enum swheel_ctrlmod_t control_mode_; // 控制模式
+    /*+044*/ double scale_control_; // 传动系数       counts*s/m(rad) *1000
+    /*+052*/ double scale_feedback_; // 反馈系数      m(rad)/(s*counts)           *1000
+    /*+060*/ double control_cp_; // 控制角度时所用的pid参数，控制PID（用于离散变化率控制或连续变化率控制）      *1000
+    /*+068*/ double control_ci_;     //  *1000
+    /*+076*/ double control_cd_;     //  *1000
+};
+
 typedef struct _var__swheel_t {
     // 全局只读
     /*+000*/ double min_angle_; // 行驶的最小角度         rad
@@ -30,8 +44,8 @@ typedef struct _var__swheel_t {
     /*+044*/ double scale_control_; // 传动系数       counts*s/m(rad) *1000
     /*+052*/ double scale_feedback_; // 反馈系数      m(rad)/(s*counts)           *1000
     /*+060*/ double control_cp_; // 控制角度时所用的pid参数，控制PID（用于离散变化率控制或连续变化率控制）      *1000
-    /*+068*/ double control_ci_;                                                                  //  *1000
-    /*+076*/ double control_cd_;                                                                //         *1000
+    /*+068*/ double control_ci_;     //  *1000
+    /*+076*/ double control_cd_;     //  *1000
 
     // 外部可写 (数据下行,可作为绑定目标)
     /*+084*/ int enabled_; // 使能状态
@@ -57,6 +71,17 @@ typedef struct _var__swheel_t {
         char u_;
     };
 } var__swheel_t;
+
+struct var__dwheel_config_t {
+    /*+000*/ double max_speed_;
+    /*+008*/ double max_acc_; //最大加速度
+    /*+016*/ double max_dec_; //最大减速度
+    /*+024*/ enum dwheel_ctrlmod_t control_mode_;
+    /*+028*/ double scale_control_; //传动系数，和反馈系数这两个值一般是一样的，由减速比，轮子直径，码盘线数等决定
+    /*+036*/ double scale_feedback_; //反馈系数
+    /*+044*/ double roll_weight_; //滚动约束权重          *1000
+    /*+052*/ double slide_weight_; //侧滑约束权重                   *1000
+};
 
 typedef struct _var__dwheel_t {
     // 全局只读
