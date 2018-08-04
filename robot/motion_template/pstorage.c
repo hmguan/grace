@@ -71,6 +71,7 @@ struct p_storage_t {
 
 static pthread_mutex_t lock_calibration = PTHREAD_MUTEX_INITIALIZER;
 static struct period_storage_data mapped_data = {.mptr = NULL, .mlen = 0 };
+static int p_storage_retval = -1;
 
 int mm__load_mapping() {
     char path[256];
@@ -138,11 +139,12 @@ int mm__load_mapping() {
         close(fd);
     }
 	
+    p_storage_retval = retval;
     return retval;
 }
 
 void mm__release_mapping() {
-	if (mapped_data.mptr && mapped_data.mlen > 0 ) {
+	if (mapped_data.mptr && mapped_data.mlen > 0 && p_storage_retval >= 0) {
 		munmap(mapped_data.mptr, sizeof (mapped_data.mlen));
 	}
 }
@@ -151,7 +153,7 @@ int mm__getupl(void *upl) {
     struct p_storage_formt *formt;
     struct p_storage_t *pmap;
 
-    if (!mapped_data.mptr || 0 == mapped_data.mlen) {
+    if (!mapped_data.mptr || 0 == mapped_data.mlen || p_storage_retval < 0) {
         return -EINVAL;
     }
 
@@ -166,7 +168,7 @@ int mm__setupl(const void *upl) {
     struct p_storage_formt *formt;
     struct p_storage_t *pmap;
 
-    if (!mapped_data.mptr || 0 == mapped_data.mlen) {
+    if (!mapped_data.mptr || 0 == mapped_data.mlen || p_storage_retval < 0) {
         return -EINVAL;
     }
 
@@ -181,7 +183,7 @@ int mm__getloc(void *loc, int cb) {
     unsigned char *forloc;
     struct p_storage_t *pmap;
 
-    if (!mapped_data.mptr || 0 == mapped_data.mlen) {
+    if (!mapped_data.mptr || 0 == mapped_data.mlen || p_storage_retval < 0) {
         return -EINVAL;
     }
 
@@ -196,7 +198,7 @@ int mm__setloc(const void *loc, int cb) {
     unsigned char *forloc;
     struct p_storage_t *pmap;
 
-    if (!mapped_data.mptr || 0 == mapped_data.mlen) {
+    if (!mapped_data.mptr || 0 == mapped_data.mlen || p_storage_retval < 0) {
         return -EINVAL;
     }
 
@@ -319,7 +321,7 @@ int mm__set_calibration(int varid, int cb, const void *data) {
     struct p_storage_calibration_describe *p_calibration_desc;
     struct p_storage_t *pmap;
 
-    if (!mapped_data.mptr || 0 == mapped_data.mlen || !data || cb <= 0) {
+    if (!mapped_data.mptr || 0 == mapped_data.mlen || !data || cb <= 0 || p_storage_retval < 0 ) {
         return -EINVAL;
     }
 
@@ -338,7 +340,7 @@ int mm__get_calibration(int varid, void *data) {
         struct p_storage_calibration_describe *p_calibration_desc;
     struct p_storage_t *pmap;
 
-    if (!mapped_data.mptr || 0 == mapped_data.mlen || !data) {
+    if (!mapped_data.mptr || 0 == mapped_data.mlen || !data || p_storage_retval < 0) {
         return -EINVAL;
     }
 

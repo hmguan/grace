@@ -450,12 +450,12 @@ int main(int argc, char **argv) {
                 var__release_object_reference(nav);
             }
         }
+
+        /* var adjust by mapped memory */
+        var__convert_by_mapping();
     } else {
         log__save("motion_template", kLogLevel_Warning, kLogTarget_Filesystem | kLogTarget_Stdout, "failed load file mapping for UPL.");
     }
-
-    /* var adjust by mapped memory */
-    var__convert_by_mapping();
 
 #ifndef _WIN32
     nis_checr(&mtecr);
