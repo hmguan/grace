@@ -213,3 +213,30 @@ int motion_interface::uninit() {
 int motion_interface::common_write_by_id(int id, mn::common_data &, void*) {
     return 0;
 }
+
+int motion_interface::common_read_by_id(int id, mn::common_title &vct_write, void*)
+{
+    return 0;
+}
+
+int motion_interface::do_offline_nextstep_syn(uint64_t task_id)
+{
+    mn::task_status_t *asio;
+    nsp::os::waitable_handle w(0);
+    int retval = mn::post_offline_nextstep(__net_id, task_id, [&](uint32_t id, const void *data) {
+        asio = (mn::task_status_t *)data;
+        retval = asio->err_;
+        if (retval < 0) {
+            loerror("motion_interface") << "post post_offline_nextstep command failed.asio_data_.get_err() < 0";
+            w.sig();
+            return;
+        }
+        w.sig();
+    });
+    if (retval < 0) {
+        loerror("motion_interface") << "post post_offline_nextstep command failed.iRet < 0";
+        return -1;
+    }
+    w.wait();
+    return retval;
+}

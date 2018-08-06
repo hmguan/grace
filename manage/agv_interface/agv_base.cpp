@@ -4,6 +4,7 @@
 #include "net_impls.h"
 #include "mntypes.h"
 
+
 #include <iostream>
 #include "usrdef.h"
 #include "agv_atom_taskdata_nav.h"
@@ -608,6 +609,14 @@ void agv_base::on_task( std::shared_ptr<agv_taskdata_base>& taskdata ) {
 				th_combine_task( task );
 			}
 			break;
+        case AgvTaskType_Offline:
+        
+            {
+                std::shared_ptr<agv_offline_taskdata> task = std::static_pointer_cast<agv_offline_taskdata, agv_taskdata_base>(taskdata);
+                th_offline_task(task);
+            }
+        
+            break;
 		default:
 			break;
 	}
@@ -1955,6 +1964,24 @@ void agv_base::common_read_ack( uint32_t id, const void *data ) {
                                  }
             }
                 break;
+            case kVarType_OfflineTask:
+            {
+                {
+                    std::lock_guard<decltype(__mtx_offtask)> lock(__mtx_offtask);
+                    var_offline_task* vh = (var_offline_task*)(ca.data.c_str());
+                    memcpy(&__var_offtask, vh, sizeof(__var_offtask));
+                }
+
+                                         if (__var_offtask.track_status_.response_ > kStatusDescribe_FinalFunction)
+                                         {
+                                             std::lock_guard<decltype(__mtx_offtask_ptr)> lock(__mtx_offtask_ptr);
+                                             if (__offline_task && __offline_task->get_task_phase() == AgvTaskPhase_Fin)
+                                             {
+                                                 __offline_task->callback_status(__var_offtask.track_status_.response_, kAgvInterfaceError_OK);
+                                             }
+                                         }
+            }
+                break;
 			default:
 				get_elongate_variable_ack( id, data );
 				break;
@@ -2038,6 +2065,7 @@ void agv_base::update_agv_data() {
         //loinfo("agvbase_debug") << "AgvBase:" << __agv_id << " update_agv_data 7";
         get_var_info_by_id_asyn<var__dio_t>(kVarFixedObject_InternalDIO);
 
+        get_var_info_by_id_asyn<var_offline_task>(kVarFixedObject_OfflineTask);
         //loinfo("agvbase_debug") << "AgvBase:" << __agv_id << " update_agv_data 8";
         get_elongate_variable();
         //loinfo("agvbase_debug") << "AgvBase:" << __agv_id << " update_agv_data 9";
@@ -4863,6 +4891,25 @@ void agv_base::common_read_ack_subscrbe(uint32_t id, const void *data) {
                              }
         }
             break;
+        case kVarType_OfflineTask:
+        {
+            {
+                std::lock_guard<decltype(__mtx_offtask)> lock(__mtx_offtask);
+                for (auto& itm : asio_data_->items)
+                {
+                    memcpy((char*)&__var_offtask + itm.offset, itm.data.c_str(), itm.data.size());
+                }
+            }
+
+                                     if (__var_offtask.track_status_.response_ > kStatusDescribe_FinalFunction)
+                                     {
+                                         std::lock_guard<decltype(__mtx_offtask_ptr)> lock(__mtx_offtask_ptr);
+                                         if (__offline_task && __offline_task->get_task_phase() == AgvTaskPhase_Fin)
+                                         {
+                                             __offline_task->callback_status(__var_offtask.track_status_.response_, kAgvInterfaceError_OK);
+                                         }
+                                     }
+        }
         default:
             get_elongate_variable_ack(id, data);
             break;
@@ -4877,4 +4924,177 @@ void agv_base::common_read_ack_subscrbe(uint32_t id, const void *data) {
 int agv_base::on_login()
 {
     return 0;
+}
+
+int agv_base::new_offline_task(const std::vector<offline_task_item>& vct_task, /*离线任务列表 */ uint64_t& task_id, std::function<void(uint64_t taskid, status_describe_t status, int err, void* user)> fn, void* user /*= nullptr*/, std::function<void(int percent)> fn_asyn_send_rate /*= nullptr /*离线任务下载进度，如果没有注册回调，则此接口同步阻塞 */)
+{
+    if (__net_status < 0) {
+        return -1;
+    }
+
+    if (__offline_task)
+    {
+        if (__offline_task->get_task_phase() != AgvTaskPhase_None)
+        {
+            return -99;
+        }
+    }
+
+    __offline_task = std::shared_ptr<agv_offline_taskdata>(new agv_offline_taskdata());
+
+    std::shared_ptr<agv_offline_taskdata> p = __offline_task;
+    p->__vct_task = vct_task;
+    p->__task_id = ++__offline_task_id;
+    p->__fn_result = fn;
+    p->__user = user;
+    p->__fn_asyn_send_rate = fn_asyn_send_rate;
+    task_id = p->__task_id;
+    p->set_task_phase(AgvTaskPhase_Send);
+
+    if (fn_asyn_send_rate)
+    {
+        post_task(p);
+    }
+    else
+    {
+        return th_offline_task(p);
+    }
+
+    return 0;
+}
+
+int agv_base::cancel_offline_task(uint64_t& task_id)
+{
+    int err = 0;
+    nsp::os::waitable_handle wait_request(0);
+    task_status_t* asio_data;
+    int r = mn::cancel_offline_task(__net_id, task_id,
+        [&](uint32_t robot_id, const void *data) {
+
+        asio_data = (task_status_t*)data;
+        if (!data) {
+            err = asio_data->err_;
+            wait_request.sig();
+            return;
+        }
+        if (asio_data->err_ < 0) {
+            wait_request.sig();
+            return;
+        }
+        if (!asio_data) {
+            wait_request.sig();
+            return;
+        }
+        wait_request.sig();
+    });
+
+    if (r < 0) {
+        return -1;
+    }
+
+    wait_request.wait();
+    return err;
+}
+
+int agv_base::th_offline_task(std::shared_ptr<agv_offline_taskdata> p) 
+{
+    upl_t cur_upl = __nav.i.upl_;
+    cur_upl.percentage_ /= 100;
+
+    mn::mn_offline_task ot;
+    int cur_cnt = 0;
+    int total_cnt = p->__vct_task.size() + 1;
+    p->callback_rate(0);
+    for (auto item:p->__vct_task)
+    {
+        int dock_id = item.dock_id;
+        upl_t destUpl;
+        position_t dest_pos;
+        if (__layout->get_dest_by_dockid(dock_id, destUpl, dest_pos) < 0) {
+            loerror("agvbase") << "AgvBase:" << __agv_id << " dock= " << dock_id << " not exist!";
+            __last_interface_error = kAgvInterfaceError_NoDock;
+            __last_interface_error_str = std::string("agvbase:dock ") + std::to_string(dock_id) + std::string(" not exist");
+            p->callback_status(kStatusDescribe_Error, kAgvInterfaceError_NoDock);
+            return -2;
+        }
+
+        double dis = 0;
+        std::vector<trail_t> pathUpl;
+        if (__layout->path_search(cur_upl, destUpl, pathUpl, dis) < 0) {
+            //err
+            loerror("agvbase") << "AgvBase:" << __agv_id << " path_search from (" << cur_upl.edge_id_ << " " << cur_upl.percentage_ << " " << cur_upl.angle_ << ") to("
+                << destUpl.edge_id_ << " " << destUpl.percentage_ << " " << destUpl.angle_ << ") failed!";
+
+            p->callback_status(kStatusDescribe_Error, kAgvInterfaceError_PathSearch);
+            __last_interface_error = kAgvInterfaceError_PathSearch;
+            __last_interface_error_str = std::string("agvbase: path_search failed, from edge ") + std::to_string(cur_upl.edge_id_) + std::string(" to")
+                + std::string(" edge ") + std::to_string(destUpl.edge_id_);
+            return -1;
+        }
+
+        cur_upl = destUpl;
+
+        mn::offline_task_node_t   otn;
+        otn.dest_pos_ = dest_pos;
+        otn.dest_upl_ = destUpl;
+        otn.trails_ = pathUpl;
+        
+        for (auto& op:item.ops)
+        {
+            offline_operator_node_t oon;
+            memcpy(&oon.code_, &op.code_, sizeof(oon)-sizeof(oon.task_id_));
+            otn.opers_.push_back(oon);
+        }
+
+        ot.push_back(otn);
+
+        p->callback_rate(100 * (cur_cnt++) / total_cnt);
+    }
+
+    int err = 0;
+    nsp::os::waitable_handle wait_request(0);
+    task_status_t* asio_data;
+    int r = post_offline_task(__net_id, p->__task_id, ot,
+        [&](uint32_t robot_id, const void *data) {
+
+        asio_data = (task_status_t*)data;
+        if (!data) {
+            err = asio_data->err_;
+            wait_request.sig();
+            return;
+        }
+        if (asio_data->err_ < 0) {
+            wait_request.sig();
+            return;
+        }
+        if (!asio_data) {
+            wait_request.sig();
+            return;
+        }
+        wait_request.sig();
+    });
+
+
+    if (r < 0) {
+        err = -1;
+    }
+    else
+    {
+       wait_request.wait();
+    }
+
+    if (err < 0)
+    {
+        p->callback_rate(99); 
+        p->callback_status(kStatusDescribe_Error, kAgvInterfaceError_SendFailed);
+    }
+    else
+    {
+        p->callback_rate(100);
+        p->set_task_phase(AgvTaskPhase_Fin);
+    }
+    
+    
+    return err;
+
 }

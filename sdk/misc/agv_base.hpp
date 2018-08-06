@@ -35,8 +35,8 @@
 #include "agv_atom_taskdata_opt.h"
 #include "agv_combine_taskdata_base.h"
 #include "agv_combine_taskdata_gotoaction.h"
-
-
+#include "agv_offline_taskdata.h"
+#include "offlinetask.h"
 class agv_base;
 
 
@@ -127,6 +127,14 @@ public: //task
     int pause_gotocharge();
     int resume_gotocharge();
     int cancel_gotocharge();
+
+public://offline task
+
+    int new_offline_task(const std::vector<offline_task_item>& vct_task,     //离线任务列表
+        uint64_t& task_id, std::function<void(uint64_t taskid, status_describe_t status, int err, void* user)> fn, void* user = nullptr,
+        std::function<void(int percent)> fn_asyn_send_rate = nullptr //离线任务下载进度 (0 ~ 100)，如果没有注册回调，则此接口同步阻塞式执行
+        );
+    int cancel_offline_task(uint64_t& task_id);
 
 public://syn      
     int pause_nav_syn();
@@ -314,7 +322,7 @@ private:
     int get_combineseq_header(std::shared_ptr<agv_combine_taskdata_header>& task);
 
     int get_gzarm_error_detail(std::vector<std::string>& v);
-
+    int th_offline_task(std::shared_ptr<agv_offline_taskdata> p);
 protected:
     int __agv_id;
     vehicle_type_t __agv_type;
@@ -467,14 +475,24 @@ private:
          kAgvInterfaceError_OK = 0,
          kAgvInterfaceError_NoDock,
          kAgvInterfaceError_PathSearch,
+         kAgvInterfaceError_SendFailed,
     };
     AGVINTERFACE_ERROR __last_interface_error = kAgvInterfaceError_OK;
     std::string __last_interface_error_str;
 
 private:
     void common_read_ack_subscrbe(uint32_t id, const void *data);
+
     mn::common_title __vec_post_common;
     std::map<int, mn::common_title>  __map_subscribe_data;
+
+private:
+    std::atomic<uint64_t> __offline_task_id{ 0 };
+    status_describe_t __offline_prc = kStatusDescribe_Resume;
+    std::mutex __mtx_offtask_ptr;
+    std::shared_ptr<agv_offline_taskdata> __offline_task = nullptr;
+    mutable std::mutex __mtx_offtask;
+    var_offline_task __var_offtask;
 };
 
 template<typename T>

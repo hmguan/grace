@@ -46,11 +46,14 @@ public:
 	op.code_ = 1;
 	op.param0_ = 1000;
 
-	std::vector<common_write_t> v;
+	mn::common_data v;
 	mi.common_write_by_id(kVarFixedObject_Operation, v, &op, &op.code_, &op.param0_);
 
 	*/
 	template<class T, class ...MEMBERS_T> int common_write_by_id( int id, mn::common_data &vct_write, void *begin, T head, MEMBERS_T...members );
+
+
+    template<class T, class ...MEMBERS_T> int common_read_by_id(int id, mn::common_title &vct_write, void *begin, T head, MEMBERS_T...members);
 public://not template
 	int control_speed( double vx, double vy, double vw );
 	int cancel_nav();
@@ -58,17 +61,65 @@ public://not template
 	int set_usrdef_buf_syn( int offet, char* data_usr, int len );
 	int safety_enable( int enable );
 	int nsp__report_status( uint64_t task_id, int id, status_describe_t sd, int u = 0, int i = 0 );
+
+    int do_offline_nextstep_syn(uint64_t task_id);
 public:
 	void bind_canio_fn( std::function<void( const mn::canio_msg_t & )> fn );
 
 private:
 	void recv_event( int32_t net_id, const void *data, int type );
     int common_write_by_id(int id, mn::common_data &vct_write, void*); 
-
+    int common_read_by_id(int id, mn::common_title &vct_write, void*);
 protected:
 	int   __net_id = -1;
 	std::function<void( const mn::canio_msg_t & )> notify_canio_ = nullptr;
 };
+
+template<class T, class ...MEMBERS_T>
+int motion_interface::common_read_by_id(int id, mn::common_title &title, void *begin, T head, MEMBERS_T...members)
+{
+    mn::common_title_item node;
+    node.varid = id;
+    node.length = sizeof(*head);
+    node.offset = (char*)head - (char*)begin;
+    title.items.push_back(node);
+    int argc = sizeof...(members);
+    if (argc > 0) {
+        return common_read_by_id(id, title, begin, members...);
+    }
+    else
+    {
+
+        int retval = -1;
+        nsp::os::waitable_handle w(0);
+        mn::common_data *asio;
+        retval = mn::post_common_read_request_by_id(__net_id, title, [&](uint32_t, const void *data) {
+            asio = (mn::common_data *)data;
+            retval = asio->err_;
+            if (retval < 0) {
+                loerror("motion_interface") << "common_read_by_id failed，error= " << retval << " id = " << id;
+                w.sig();
+                return;
+            }
+
+            for (int i = 0; i < asio->items.size(); i++) {
+
+                memcpy((char*)begin + asio->items[i].offset, asio->items[i].data.data(), asio->items[i].data.size());
+
+            }
+            w.sig();
+        });
+        if (retval < 0) {//如果接口调用失败，那么直接返回
+            loerror("motion_interface") << "common_read_by_id failed，ret < 0，id = " << id;
+            return retval;
+        }
+        w.wait();
+        return retval;
+
+    }
+
+    return 0;
+}
 
 template<typename T>
 int motion_interface::get_var_info_by_id( int id, T& var ) {
