@@ -1,5 +1,5 @@
 ﻿/*!
- * file agv_atom_task_define.h
+ * file agv_task_define.h
  * date 2017/08/03 16:53
  *
  * author chenkai
@@ -11,12 +11,14 @@
 
 #ifndef __AGV_TASK_DEFINE_H_CK__
 #define __AGV_TASK_DEFINE_H_CK__
-
+#include "operation.h"
+#include <vector>
 enum agv_task_types
 {
     AgvTaskType_None = -1,
     AgvTaskType_Atom = 0,
     AgvTaskType_Combine,
+    AgvTaskType_Offline,
 };
 
 enum agv_task_phase
@@ -107,6 +109,9 @@ enum agv_combine_taskdata_types
 
 };
 
-
+struct offline_task_item{
+    int dock_id;
+    std::vector<var__operation_t> ops;
+};
 
 #endif
