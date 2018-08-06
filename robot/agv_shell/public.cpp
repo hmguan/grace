@@ -84,7 +84,7 @@ std::string convert_positive(const std::string& str, const char preview_cr, cons
 }
 
 #ifndef _WIN32
-static int tar_cmd_exec(std::string cmd_str)
+static int tar_cmd_exec(std::string& cmd_str)
 {
 	int ret = system(cmd_str.c_str());
 	if (-1 != ret && ret != 0) {
@@ -110,7 +110,7 @@ static void get_relative_path(std::string &path_new, std::string &file_name)
 static int set_cmd_str_head(
 	std::string &cmd_str, 
 	std::string &path_old, std::string &path_new,
-	const std::string compressed_file_name)
+	const std::string& compressed_file_name)
 {
 	int ret = 0;
 	if (path_new != path_old) {
@@ -129,8 +129,8 @@ static int set_cmd_str_head(
 
 static int check_cmd_length(
 	std::string &cmd_str, const long max_size,
-	const std::string file_name, const std::string path_new,
-	const std::string compressed_file_name)
+	const std::string& file_name, const std::string& path_new,
+	const std::string& compressed_file_name)
 {
 	int ret = 0;
 	long len = cmd_str.size() + file_name.size();
