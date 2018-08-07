@@ -2,6 +2,14 @@
 #define DEF_OFFLINETASK_H
 #include "vartypes.h"
 
+#pragma pack(push ,1)
+
+// 数组数据 
+typedef struct var_offline_vector {
+	int count_;
+	char data[0];
+} var_offline_vector_t;
+
 // 离线操作 
 typedef struct var_offline_oper {
 	uint64_t task_id_;
@@ -41,6 +49,8 @@ typedef struct var_offline_task {
 	// 离线任务节点数据，个数不定 
 	var_offline_task_node_t tasks_[1];
 } var_offline_task_t;
+
+#pragma pack(pop)
 
 extern var_offline_task_t *var__get_offline_task();
 extern int var__set_offline_task(const char *data, int cb);
