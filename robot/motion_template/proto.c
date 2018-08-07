@@ -1487,20 +1487,25 @@ static int nspi__on_offline_navigation_task(const var_offline_task_t *offline_ta
 }
 
 static int nspi__on_offline_next_step(HTCPLINK link, const char *data, int cb) {
-	nsp__cancel_offline_task_t *pkt_cancel_offline_task = (nsp__cancel_offline_task_t *)data;
-	nsp__cancel_offline_task_t ack_cancel_offline_task;
+	nsp__nextstep_offline_task_t *pkt_next_offline_task = (nsp__cancel_offline_task_t *)data;
+	nsp__nextstep_offline_task_t ack_cancel_offline_task;
 	var_offline_task_t *offline_task = NULL;
 
-	memcpy(&ack_cancel_offline_task, pkt_cancel_offline_task, sizeof(nsp__cancel_offline_task_t));
-	ack_cancel_offline_task.head_.type_ = PKTTYPE_CANCEL_OFFLINE_TASK_ACK;
+	memcpy(&ack_cancel_offline_task, pkt_next_offline_task, sizeof(nsp__cancel_offline_task_t));
+	ack_cancel_offline_task.head_.type_ = PKTTYPE_OFFLINE_NEXT_STEP_ACK;
 
 	offline_task = var__get_offline_task();
 	if (offline_task) {
 		if (offline_task->track_status_.command_ == kStatusDescribe_Idle) {
 			var__xchange_command_status(&offline_task->track_status_, kStatusDescribe_Startup, NULL);
 		}
-		ack_cancel_offline_task.head_.err_ = nspi__on_offline_navigation_task(offline_task);
-		offline_task->task_current_exec_index_ += 1;
+		if (offline_task->task_current_exec_index_ >= offline_task->task_count_) {
+			ack_cancel_offline_task.head_.err_ = -EPERM;
+		}
+		else {
+			ack_cancel_offline_task.head_.err_ = nspi__on_offline_navigation_task(offline_task);
+			offline_task->task_current_exec_index_ += 1;
+		}
 		var__release_object_reference(offline_task);
 	} else {
 		ack_cancel_offline_task.head_.err_ = -ENOENT;

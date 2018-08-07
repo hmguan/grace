@@ -1298,6 +1298,12 @@ namespace mn {
 			task_node.dest_pos_.x_ = iter_node.dest_pos_.x_;
 			task_node.dest_pos_.y_ = iter_node.dest_pos_.y_;
 			task_node.dest_pos_.w_ = iter_node.dest_pos_.w_;
+			for (const auto &iter_traj : iter_node.trails_) {
+				nsp::proto::trail_t task_trail;
+				task_trail.edge_id_ = iter_traj.edge_id_;
+				task_trail.wop_id_ = iter_traj.wop_id_;
+				task_node.trails_.push_back(std::move(task_trail));
+			}
 			for (const auto &iter_oper : iter_node.opers_) {
 				nsp::proto::proto_offline_operation_t task_oper;
 				task_oper.task_id_ = iter_oper.task_id_;
@@ -1316,6 +1322,7 @@ namespace mn {
 			}
 			packet.nodes_.push_back(std::move(task_node));
 		}
+		packet.calc_size();
 		return pool_.queue_packet(pktid, asio, [&]() ->int {
 			return psend(&packet);
 		});
