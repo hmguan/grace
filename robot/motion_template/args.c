@@ -19,8 +19,6 @@ struct  {
 	uint16_t __udp_port;
 	char __canio_driver_file[RUN_FILENAME_LENGTH];
     int __must_login;
-    char __essn_ipv4[posix__ipv4_length];
-    uint16_t __essn_port;
     int __load_on_exec;
 } __startup_parameters;
 
@@ -37,8 +35,6 @@ enum opt_invisible_indx {
     kInvisibleOptIndex_ServiceTcpPort,
 	kInvisibleOptIndex_ServiceUdpPort,
 	kInvisibleOptIndex_NoLogin,
-    kInvisibleOptIndex_EssnHost,
-    kInvisibleOptIndex_EssnPort,
     kInvisibleOptIndex_LoadOnExec,
 };
 
@@ -52,8 +48,6 @@ static const struct option long_options[] = {
     {"service-tcp-port", required_argument, NULL, kInvisibleOptIndex_ServiceTcpPort},
 	{"service-udp-port", required_argument, NULL, kInvisibleOptIndex_ServiceUdpPort },
 	{"no-login", no_argument, NULL, kInvisibleOptIndex_NoLogin },
-    {"essn-host", required_argument, NULL, kInvisibleOptIndex_EssnHost},
-    {"essn-port", required_argument, NULL, kInvisibleOptIndex_EssnPort},
     {"load-on-exec", no_argument, NULL, kInvisibleOptIndex_LoadOnExec},
     {NULL, 0, NULL, 0}
 };
@@ -71,13 +65,14 @@ void run__dispay_usage() {
             "\t\t[-h|--help] display usage context and help informations\n"
             "\t\t[-v|--version] display versions of executable archive\n"
             "\t\t[-s|--simulate] simulate motion driver/device.\n"
+            "\t\t[-r|--recover] recover calibration from xml to binary\n"
+            "\t\t[-a|--apply] apply calibration from binary to xml.WARNING,this operation will destory\n"
+            "\t\t\tThis operation will overwrite the existing xml files. The system will backup before covering, but it will not guarantee success.\n"
             "\t\t[--startup-simodo] initialize odo data like x:y:angle in simulate mode.\n"
             "\t\t[--service-host][%%IPV4] specify IPv4 address for local TCP/TCP network service.\n"
             "\t\t[--service-tcp-port][%%TCP PORT] specify port for local TCP network service.\n"
 			"\t\t[--service-udp-port][%%UDP PORT] specify port for local UDP network service.\n"
 			"\t\t[--no-login] do not use login pakcet to verifity network connection.\n"
-            "\t\t[--essn-host][%%IPV4] specify IPv4 address for essn host\n"
-            "\t\t[--essn-port][%%IPV4] specify IPv4 address for essn port\n"
             "\t\t[--load-on-exec] load storage data from file on process startup\n"
             ;
 
@@ -130,9 +125,6 @@ int run__check_args(int argc, char **argv) {
     /* 默认的服务 endpoint 从配置文件获取 */
     memset(__startup_parameters.__tcp_ipv4, 0, sizeof(__startup_parameters.__tcp_ipv4));
     __startup_parameters.__tcp_port = 0;
-    /* 事件服务器默认建立在本地, 并使用4411 端口 */
-    posix__strcpy(__startup_parameters.__essn_ipv4, cchof(__startup_parameters.__essn_ipv4), "127.0.0.1");
-    __startup_parameters.__essn_port = 4411;
     /* no need to load storage form file on process startup by default */
     __startup_parameters.__load_on_exec = 0;
     
@@ -147,7 +139,7 @@ int run__check_args(int argc, char **argv) {
     /* 组合长短启动参数， 执行综合判定 */
     posix__sprintf(shortopts, cchof(shortopts), "svhl:%d:%d:%d:%d:%d:%d:%d", 
 		kInvisibleOptIndex_StartupSimOdo, kInvisibleOptIndex_ServiceHost, kInvisibleOptIndex_ServiceTcpPort, kInvisibleOptIndex_ServiceUdpPort, \
-		kInvisibleOptIndex_EssnHost, kInvisibleOptIndex_EssnPort, kInvisibleOptIndex_NoLogin, kInvisibleOptIndex_LoadOnExec );
+		kInvisibleOptIndex_NoLogin, kInvisibleOptIndex_LoadOnExec );
     opt = getopt_long(argc, argv, shortopts, long_options, &opt_index);
     while (opt != -1) {
         switch (opt) {
@@ -192,16 +184,6 @@ int run__check_args(int argc, char **argv) {
 					__startup_parameters.__udp_port = (uint16_t)strtoul(optarg, NULL, 10);
 				}
 				break;
-			case kInvisibleOptIndex_EssnHost:
-                if (optarg){
-                    posix__strcpy(__startup_parameters.__essn_ipv4, cchof(__startup_parameters.__essn_ipv4), optarg);
-                }
-                break;
-            case kInvisibleOptIndex_EssnPort:
-                if (optarg){
-                    __startup_parameters.__essn_port = (uint16_t)strtoul(optarg, NULL, 10);
-                }
-                break;
             case kInvisibleOptIndex_NoLogin:
                 __startup_parameters.__must_login = 0;
                 break;
@@ -233,25 +215,12 @@ char *run__getarg_tcphost(char *host){
     return host;
 }
 
-char *run__getarg_essnhost(char *host) {
-    if (host){
-        posix__strcpy(host, posix__ipv4_length, __startup_parameters.__essn_ipv4);
-    }
-    
-    return host;
-}
-
 uint16_t run__getarg_tcpport(){
     return __startup_parameters.__tcp_port;
 }
 
-
 uint16_t run__getarg_udpport(){
 	return __startup_parameters.__udp_port;
-}
-
-uint16_t run__getarg_essnport(){
-    return __startup_parameters.__essn_port;
 }
 
 posix__boolean_t run__getarg_simflag(){
