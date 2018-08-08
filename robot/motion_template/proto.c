@@ -1504,7 +1504,10 @@ static int nspi__on_offline_next_step(HTCPLINK link, const char *data, int cb) {
 		}
 		else {
 			ack_cancel_offline_task.head_.err_ = nspi__on_offline_navigation_task(offline_task);
-			offline_task->task_current_exec_index_ += 1;
+			if (0 == ack_cancel_offline_task.head_.err_) {
+				// 当前导航正常才允许执行下一步导航 
+				offline_task->task_current_exec_index_ += 1;
+			}
 		}
 		var__release_object_reference(offline_task);
 	} else {
