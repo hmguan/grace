@@ -13,13 +13,9 @@ int run__check_args(int argc, char **argv);
 extern
 char *run__getarg_tcphost(char *host);
 extern
-char *run__getarg_essnhost(char *host);
-extern
 uint16_t run__getarg_tcpport();
 extern
 uint16_t run__getarg_udpport();
-extern
-uint16_t run__getarg_essnport();
 extern
 posix__boolean_t run__getarg_simflag();
 extern

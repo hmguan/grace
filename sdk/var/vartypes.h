@@ -223,15 +223,15 @@ enum nsp__controlor_type_t {
     kControlorType_Unknown = 0x100,
     kControlorType_NetworkIdentity = kControlorType_Unknown,
     kControlorType_Manual = kControlorType_NetworkIdentity,
-    kControlorType_LSS = (kControlorType_NetworkIdentity << 1),
-    kControlorType_LayoutDesigner = (kControlorType_NetworkIdentity << 2),
-    kControlorType_Localization = (kControlorType_NetworkIdentity << 3),
-    kControlorType_Robot = (kControlorType_NetworkIdentity << 4),
-    kControlorType_TrafficControl = (kControlorType_NetworkIdentity << 5),
-    kControlorType_RealtimeViewer = (kControlorType_NetworkIdentity << 6),
-    kControlorType_Dispatcher = (kControlorType_NetworkIdentity << 7),
-    kControlorType_Customer = (kControlorType_NetworkIdentity << 8),
-    kControlorType_Guest = (kControlorType_NetworkIdentity << 9),
+    kControlorType_LSS = (kControlorType_NetworkIdentity << 1),                 /* 0x200 */
+    kControlorType_LayoutDesigner = (kControlorType_NetworkIdentity << 2),      /* 0x400 */
+    kControlorType_Localization = (kControlorType_NetworkIdentity << 3),        /* 0x800 */
+    kControlorType_Robot = (kControlorType_NetworkIdentity << 4),               /* 0x1000 */
+    kControlorType_TrafficControl = (kControlorType_NetworkIdentity << 5),      /* 0x2000 */
+    kControlorType_RealtimeViewer = (kControlorType_NetworkIdentity << 6),      /* 0x4000 */
+    kControlorType_Dispatcher = (kControlorType_NetworkIdentity << 7),          /* 0x8000 */
+    kControlorType_Customer = (kControlorType_NetworkIdentity << 8),            /* 0x10000 */
+    kControlorType_Guest = (kControlorType_NetworkIdentity << 9),               /* 0x20000 */
     kControlorType_MaximumFunctions = kControlorType_Guest,
 };
 

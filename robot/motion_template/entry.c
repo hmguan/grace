@@ -32,7 +32,6 @@
 
 #include <time.h>
 
-#include "memdump.h"
 #include "pstorage.h"
 
 #pragma pack(push, 1)
@@ -74,7 +73,7 @@ int run__interval_control(posix__waitable_handle_t *waiter, uint64_t begin_tick,
     return interval;
 }
 
-int run__algorithm_traj_control(void *memory_dump_object) {
+int run__algorithm_traj_control() {
     int retval = -1;
 
     posix__boolean_t sim = run__getarg_simflag();
@@ -280,7 +279,6 @@ void *run__navigation_proc(void *argv) {
     uint64_t begin_tick;
     var__error_handler_t *err;
     static const uint32_t NAVIGATION_INTERVAL = 20;
-    void *memory_dump_object;
 
     if (posix__init_synchronous_waitable_handle(&waiter) < 0) {
         return NULL;
@@ -294,12 +292,6 @@ void *run__navigation_proc(void *argv) {
     }
     navigation_error_as_fatal = err->navigation_error_as_fatal_;
     var__release_object_reference(err);
-
-    /*  创建内存记录对象, 不成功也不影响进程运行 */
-    memory_dump_object = NULL;
-    if (allocate_memory_dump(&memory_dump_object) < 0) {
-        memory_dump_object = NULL;
-    }
 	
 	cpu_set_t set;
     CPU_ZERO(&set);
@@ -313,7 +305,7 @@ void *run__navigation_proc(void *argv) {
     while (1) {
         begin_tick = posix__gettick();
 
-        if (run__algorithm_traj_control(memory_dump_object) < 0) {
+        if (run__algorithm_traj_control() < 0) {
             log__save("motion_template", kLogLevel_Warning, kLogTarget_Filesystem | kLogTarget_Stdout, "navigation loop executive fault.");
             if (navigation_error_as_fatal) {
                 var__mark_framwork_error(kVarFixedObject_Navigation, var__make_error_code(kVarType_Navigation, kFramworkFatal_NavigationExecutiveFault));
