@@ -1397,24 +1397,10 @@ static int nspi__on_cancel_offline_task(HTCPLINK link, const char *data, int cb)
 	return tcp_write(link, ack_cancel_offline_task.head_.size_, &nsp__packet_maker, &ack_cancel_offline_task);
 }
 
-static int nspi__on_offline_navigation_task(const var_offline_task_t *offline_task) {
-	var_offline_task_node_t *task_node = NULL;
-	trail_t *trail_array = NULL;
+static int nspi__on_offline_navigation_task(var_offline_task_node_t *task_node) {
 	var__navigation_t *nav = NULL;
 	var__vehicle_t *veh = NULL;
 	int ret_value = 0;
-	char *tmp_data = (char *)&offline_task->tasks_[0];
-	int i, len = 0;
-
-	for (i = 0; i < offline_task->task_current_exec_index_; i++) {
-		task_node = (var_offline_task_node_t *)tmp_data;
-		len += sizeof(var_offline_task_node_t) - 1;
-		len += task_node->cnt_trals_ * sizeof(trail_t);
-		len += task_node->cnt_opers_ * sizeof(var_offline_oper_t);
-	}
-	tmp_data += len;
-	task_node = (var_offline_task_node_t *)tmp_data;
-	trail_array = (trail_t *)&task_node->data[0];
 
 	nav = var__get_navigation();
 	do {
@@ -1456,10 +1442,10 @@ static int nspi__on_offline_navigation_task(const var_offline_task_t *offline_ta
 		nav->traj_ref_.data_ = NULL;
 
 		// protect the source request and count of trajs 
-		nav->traj_ref_.data_ = malloc(task_node->cnt_trals_ * sizeof (trail_t));
+		nav->traj_ref_.data_ = malloc(task_node->cnt_trails_ * sizeof (trail_t));
 		if (nav->traj_ref_.data_) {
-			nav->traj_ref_.count_ = task_node->cnt_trals_;
-			memcpy(nav->traj_ref_.data_, &trail_array, task_node->cnt_trals_ * sizeof (trail_t));
+			nav->traj_ref_.count_ = task_node->cnt_trails_;
+			memcpy(nav->traj_ref_.data_, &task_node->trails_, task_node->cnt_trails_ * sizeof (trail_t));
 			var__xchange_command_status(&nav->track_status_, kStatusDescribe_Startup, NULL);
 			nav->user_task_id_ = task_node->task_id_; // using the new task id
 			posix__atomic_inc(&nav->ato_task_id_); // atomic increase inner task id
@@ -1501,9 +1487,9 @@ static int nspi__on_offline_next_step(HTCPLINK link, const char *data, int cb) {
 		}
 		if (offline_task->task_current_exec_index_ >= offline_task->task_count_) {
 			ack_cancel_offline_task.head_.err_ = -EPERM;
-		}
-		else {
-			ack_cancel_offline_task.head_.err_ = nspi__on_offline_navigation_task(offline_task);
+		} else {
+			ack_cancel_offline_task.head_.err_ = 
+				nspi__on_offline_navigation_task(&offline_task->tasks_[offline_task->task_current_exec_index_]);
 			if (0 == ack_cancel_offline_task.head_.err_) {
 				// 当前导航正常才允许执行下一步导航 
 				offline_task->task_current_exec_index_ += 1;
