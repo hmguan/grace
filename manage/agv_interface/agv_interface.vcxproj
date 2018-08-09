@@ -153,6 +153,7 @@
     <ClCompile Include="agv_combine_taskdata_goto.cpp" />
     <ClCompile Include="agv_combine_taskdata_gotoaction.cpp" />
     <ClCompile Include="agv_driver.cpp" />
+    <ClCompile Include="agv_offline_taskdata.cpp" />
     <ClCompile Include="agv_shell_alive.cpp" />
     <ClCompile Include="agv_shell_base.cpp" />
     <ClCompile Include="agv_shell_session.cpp" />

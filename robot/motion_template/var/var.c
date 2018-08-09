@@ -19,6 +19,7 @@
 #include "posix_string.h"
 #include "posix_thread.h"
 #include "posix_atomic.h"
+#include "offlinetask.h"
 
 typedef int( *config_proc_t)();
 
@@ -104,6 +105,7 @@ int var__load_var_configure() {
         &var__load_usrbuf,
         &var__load_layout,
         &var__load_optpar,
+		&var__load_offlinetask,
         &var__load_safety,
     };
     for (i = 0; (i < sizeof ( config_procs) / sizeof ( config_procs[0])); i++) {

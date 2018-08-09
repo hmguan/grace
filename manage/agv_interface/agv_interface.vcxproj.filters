@@ -278,5 +278,8 @@
     <ClCompile Include="agv_shell_alive.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="agv_offline_taskdata.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
