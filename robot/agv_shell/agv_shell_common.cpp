@@ -1076,7 +1076,11 @@ void global_parameter::load_ntp_server() {
 }
 
 int global_parameter::set_ntp_server(const std::string& address) {
-	int ret = 0;
+	int ret = nsp::tcpip::endpoint::is_effective_ipv4(address);
+	if( !ret ) {
+		loerror("agv_shell") << "invalid ip address:" << address;
+		return ret;
+	}
 #ifndef _WIN32
 	std::string file_name;
 	std::size_t pos;

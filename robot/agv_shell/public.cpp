@@ -87,7 +87,7 @@ std::string convert_positive(const std::string& str, const char preview_cr, cons
 static int tar_cmd_exec(std::string& cmd_str)
 {
 	int ret = system(cmd_str.c_str());
-	if (-1 != ret && ret != 0) {
+	if (256 != ret && 0 != ret) {
 		loerror("agv_shell") << "create tar file error:" << ret << " cmd:" << cmd_str.substr(0, 1024);
 		return -EIO;
 	}
@@ -201,10 +201,10 @@ int compress_files(const std::vector<std::string>& files, std::string& compresse
 	}
 	if(ret) {
 		// delete xxx.tar file
-		nsp::os::rmfile(compressed_file_name);
-		compressed_file_name += ".xz";
+		//nsp::os::rmfile(compressed_file_name);
+		//compressed_file_name += ".xz";
 		//delete xxx.tar.xz file
-		nsp::os::rmfile(compressed_file_name);
+		//nsp::os::rmfile(compressed_file_name);
 		return -EIO;
 	}
 
