@@ -16,6 +16,8 @@
 #include "private_udp_cache.h"
 #include "posix_atomic.h"
 
+#pragma pack(push, 1)
+
 struct cache_node_t {
     int access; 
     int using; 
@@ -26,6 +28,8 @@ struct cache_node_t {
 struct cache_pool {
     struct cache_node_t nodes[CACHE_PIECES_COUNT];
 };
+
+#pragma pack(pop)
 
 static struct cache_pool *cache = NULL;
 
