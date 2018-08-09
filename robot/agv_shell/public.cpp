@@ -201,10 +201,10 @@ int compress_files(const std::vector<std::string>& files, std::string& compresse
 	}
 	if(ret) {
 		// delete xxx.tar file
-		nsp::os::rmfile(compressed_file_name);
-		compressed_file_name += ".xz";
+		//nsp::os::rmfile(compressed_file_name);
+		//compressed_file_name += ".xz";
 		//delete xxx.tar.xz file
-		nsp::os::rmfile(compressed_file_name);
+		//nsp::os::rmfile(compressed_file_name);
 		return -EIO;
 	}
 

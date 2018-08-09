@@ -670,12 +670,12 @@ int agv_shell_session::on_post_log_info(const std::shared_ptr<nsp::proto::proto_
 		return type.log_type_ == "system_log" ? 1 : 0;
 	});
 	if (iter != data->vct_log_type_.end()) {
-		if (_access("/var/log/syslog", 0) == 0){
+		if (_access("/var/log/syslog", R_OK) == 0){
 			log_files.push_back("/var/log/syslog");
 		} else {
 			loinfo("agv_shell") << "can not access file:/var/log/syslog errno:" << errno;
 		}
-		if (_access("/var/log/messages", 0) == 0){
+		if (_access("/var/log/messages", R_OK) == 0){
 			log_files.push_back("/var/log/messages");
 		} else {
 			loinfo("agv_shell") << "can not access file:/var/log/messages errno:" << errno;
@@ -684,7 +684,7 @@ int agv_shell_session::on_post_log_info(const std::shared_ptr<nsp::proto::proto_
 	std::string strpath = "";
 	for (auto & iter : global_parameter::agv_process_) {
 		if ('.' == iter.name_.at(0)){
-			strpath = module_path;
+			strpath = module_path + "/";
 		}
 		else{
 			strpath = "";
