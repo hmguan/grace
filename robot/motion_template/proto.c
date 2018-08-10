@@ -228,7 +228,8 @@ int nspi__on_common_read_byid(HTCPLINK link, const char *data, int cb) {
                 // 内存访问越界保护
                 if (items[i].offset_ + items[i].length_ > obj->body_length_) {
                     log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
-                        "common read request memory error, offset=%u, length=%u, body=%u", items[i].offset_, items[i].length_, obj->body_length_);
+                        "common read request memory error,var_id=%u offset=%u, length=%u, body=%u", 
+						items[i].var_id_, items[i].offset_, items[i].length_, obj->body_length_);
 					read_err = -ERANGE;
                 } else {
                     memcpy(ack_item->data_, p_var + items[i].offset_, items[i].length_);
@@ -1397,7 +1398,7 @@ static int nspi__on_cancel_offline_task(HTCPLINK link, const char *data, int cb)
 	return tcp_write(link, ack_cancel_offline_task.head_.size_, &nsp__packet_maker, &ack_cancel_offline_task);
 }
 
-static int nspi__on_offline_navigation_task(var_offline_task_node_t *task_node) {
+static int nspi__on_offline_navigation_task(var_offline_task_node_t *task_node, uint64_t nav_task_id_) {
 	var__navigation_t *nav = NULL;
 	var__vehicle_t *veh = NULL;
 	int ret_value = 0;
@@ -1411,7 +1412,7 @@ static int nspi__on_offline_navigation_task(var_offline_task_node_t *task_node) 
 		}
 
 		// the new task id equal to current, request will be declined
-		if (task_node->task_id_ == nav->i.current_task_id_) {
+		if (nav_task_id_ == nav->i.current_task_id_) {
 			log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
 				"offline navigation new task id equal to current."UINT64_STRFMT, nav->i.current_task_id_);
 			ret_value = -EINVAL;
@@ -1447,7 +1448,7 @@ static int nspi__on_offline_navigation_task(var_offline_task_node_t *task_node) 
 			nav->traj_ref_.count_ = task_node->cnt_trails_;
 			memcpy(nav->traj_ref_.data_, &task_node->trails_, task_node->cnt_trails_ * sizeof (trail_t));
 			var__xchange_command_status(&nav->track_status_, kStatusDescribe_Startup, NULL);
-			nav->user_task_id_ = task_node->task_id_; // using the new task id
+			nav->user_task_id_ = nav_task_id_; // using the new task id
 			posix__atomic_inc(&nav->ato_task_id_); // atomic increase inner task id
 			log__save("motion_template", kLogLevel_Info, kLogTarget_Filesystem | kLogTarget_Stdout,
 				"successful allocate navigation task. user_id=%lld, ato_id=%lld", nav->user_task_id_, nav->ato_task_id_);
@@ -1486,10 +1487,13 @@ static int nspi__on_offline_next_step(HTCPLINK link, const char *data, int cb) {
 			var__xchange_command_status(&offline_task->track_status_, kStatusDescribe_Startup, NULL);
 		}
 		if (offline_task->task_current_exec_index_ >= offline_task->task_count_) {
+			log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
+				"offline task can't exec next step, task_current_exec_index_:%u, count:%u",
+				offline_task->task_current_exec_index_, offline_task->task_count_);
 			ack_cancel_offline_task.head_.err_ = -EPERM;
 		} else {
 			ack_cancel_offline_task.head_.err_ = 
-				nspi__on_offline_navigation_task(&offline_task->tasks_[offline_task->task_current_exec_index_]);
+				nspi__on_offline_navigation_task(&offline_task->tasks_[offline_task->task_current_exec_index_], pkt_next_offline_task->task_id_);
 			if (0 == ack_cancel_offline_task.head_.err_) {
 				// 当前导航正常才允许执行下一步导航 
 				offline_task->task_current_exec_index_ += 1;

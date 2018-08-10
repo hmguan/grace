@@ -7,7 +7,6 @@ namespace nsp {
 	namespace proto {
 		typedef struct proto_offline_operation : public nsp::proto::proto_interface
 		{
-			nsp::proto::proto_crt_t<uint64_t> task_id_;
 			nsp::proto::proto_crt_t<int32_t> code_;
 			nsp::proto::proto_crt_t<uint64_t> params0_;
 			nsp::proto::proto_crt_t<uint64_t> params1_;
@@ -23,7 +22,6 @@ namespace nsp {
 			unsigned char *serialize(unsigned char *bytes) const override
 			{
 				unsigned char *pos = bytes;
-				pos = task_id_.serialize(pos);
 				pos = code_.serialize(pos);
 				pos = params0_.serialize(pos);
 				pos = params1_.serialize(pos);
@@ -41,7 +39,6 @@ namespace nsp {
 			const unsigned char *build(const unsigned char *bytes, int &cb) override
 			{
 				const unsigned char *pos = bytes;
-				pos = task_id_.build(pos, cb);
 				pos = code_.build(pos, cb);
 				pos = params0_.build(pos, cb);
 				pos = params1_.build(pos, cb);
@@ -58,13 +55,12 @@ namespace nsp {
 
 			const int length() const override
 			{
-				return task_id_.length() + code_.length() + params0_.length() * 10;
+				return code_.length() + params0_.length() * 10;
 			}
 		} proto_offline_operation_t;
 
 		typedef struct proto_offline_node : public nsp::proto::proto_interface
 		{
-			nsp::proto::proto_crt_t<uint64_t> task_id_;
 			nsp::proto::upl_t dest_upl_;
 			nsp::proto::position_t dest_pos_;
 			nsp::proto::proto_vector_t<trail_t> trails_;
@@ -73,7 +69,6 @@ namespace nsp {
 			unsigned char *serialize(unsigned char *bytes) const override
 			{
 				unsigned char *pos = bytes;
-				pos = task_id_.serialize(pos);
 				pos = dest_upl_.serialize(pos);
 				pos = dest_pos_.serialize(pos);
 				pos = trails_.serialize(pos);
@@ -84,7 +79,6 @@ namespace nsp {
 			const unsigned char *build(const unsigned char *bytes, int &cb) override
 			{
 				const unsigned char *pos = bytes;
-				pos = task_id_.build(pos, cb);
 				pos = dest_upl_.build(pos, cb);
 				pos = dest_pos_.build(pos, cb);
 				pos = trails_.build(pos, cb);
@@ -94,7 +88,7 @@ namespace nsp {
 
 			const int length() const override
 			{
-				return task_id_.length() + dest_upl_.length() + dest_pos_.length() + trails_.length() + opers_.length();
+				return dest_upl_.length() + dest_pos_.length() + trails_.length() + opers_.length();
 			}
 		} proto_offline_node_t;
 
