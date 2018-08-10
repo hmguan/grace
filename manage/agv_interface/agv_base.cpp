@@ -1969,7 +1969,7 @@ void agv_base::common_read_ack( uint32_t id, const void *data ) {
                 {
                     std::lock_guard<decltype(__mtx_offtask)> lock(__mtx_offtask);
                     var_offline_task* vh = (var_offline_task*)(ca.data.c_str());
-                    memcpy(&__var_offtask, vh, sizeof(__var_offtask));
+					memcpy(&__var_offtask, vh, offsetof(var_offline_task, tasks_[0]));
                 }
 
                                          if (__var_offtask.track_status_.response_ > kStatusDescribe_FinalFunction)
@@ -2066,7 +2066,8 @@ void agv_base::update_agv_data() {
         get_var_info_by_id_asyn<var__dio_t>(kVarFixedObject_InternalDIO);
 
         get_var_info_by_id_asyn<var_offline_task>(kVarFixedObject_OfflineTask);
-        //loinfo("agvbase_debug") << "AgvBase:" << __agv_id << " update_agv_data 8";
+        loinfo("agvbase_debug") << "AgvBase:" << __agv_id << " update_agv_data 8";
+
         get_elongate_variable();
         //loinfo("agvbase_debug") << "AgvBase:" << __agv_id << " update_agv_data 9";
     } 
@@ -4899,9 +4900,9 @@ void agv_base::common_read_ack_subscrbe(uint32_t id, const void *data) {
                 {
                     memcpy((char*)&__var_offtask + itm.offset, itm.data.c_str(), itm.data.size());
                 }
-            }
+			}
 
-                                     if (__var_offtask.track_status_.response_ > kStatusDescribe_FinalFunction)
+									 if (__var_offtask.track_status_.response_ > kStatusDescribe_FinalFunction)
                                      {
                                          std::lock_guard<decltype(__mtx_offtask_ptr)> lock(__mtx_offtask_ptr);
                                          if (__offline_task && __offline_task->get_task_phase() == AgvTaskPhase_Fin)
@@ -5042,7 +5043,17 @@ int agv_base::th_offline_task(std::shared_ptr<agv_offline_taskdata> p)
         for (auto& op:item.ops)
         {
             offline_operator_node_t oon;
-            memcpy(&oon.code_, &op.code_, sizeof(oon)-sizeof(oon.task_id_));
+			oon.code_ = op.code_;
+			oon.params_[0] = op.param0_;
+			oon.params_[1] = op.param1_;
+			oon.params_[2] = op.param2_;
+			oon.params_[3] = op.param3_;
+			oon.params_[4] = op.param4_;
+			oon.params_[5] = op.param5_;
+			oon.params_[6] = op.param6_;
+			oon.params_[7] = op.param7_;
+			oon.params_[8] = op.param8_;
+			oon.params_[9] = op.param9_;
             otn.opers_.push_back(oon);
         }
 

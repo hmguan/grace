@@ -632,7 +632,11 @@ int agv_base::get_var_info_by_id_asyn(int id)
 	mn::common_title_item post_common;
     post_common.varid = id;
     post_common.offset = 0;
-    post_common.length = sizeof(T);
+	if (id == kVarFixedObject_OfflineTask) {
+		post_common.length = offsetof(var_offline_task, tasks_[0]);
+	} else {
+		post_common.length = sizeof(T);
+	}
     vec_post_common.items.push_back(post_common);
 
 
