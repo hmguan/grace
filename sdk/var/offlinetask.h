@@ -19,14 +19,12 @@ typedef struct var_offline_vector {
 
 // 离线操作 
 typedef struct var_offline_oper {
-	uint64_t task_id_;
 	int  code_;
 	uint64_t params_[10];
 } var_offline_oper_t;
 
 // 离线节点(导航和操作) 
 typedef struct var_offline_task_node {
-	uint64_t task_id_;
 	upl_t dest_upl_;
 	position_t dest_pos_;
 	// 参考轨迹个数 

@@ -4,11 +4,6 @@
 #include "proto.h"
 #include "logger.h"
 
-//free heap memory when next incoming offline task  arrived
-//notify customer / rex navigation completed
-//decline post_navigation_task(not customer) / post_add_navigation_task_traj / post_allocate_operation_task when offline task is existed
-//decline offline task when either navigation task or operation task is existed
-
 static objhld_t __local = -1;
 
 int var__load_offlinetask() {
@@ -154,9 +149,12 @@ int var__set_offline_task(const char *data, int cb) {
 	}
 	offline_task->user_task_id_ = task_pkt->task_id_;
 	offline_task->task_count_ = task_pkt->cnt_nodes_;
+	offline_task->task_current_exec_index_ = 0;
 	len = cb - sizeof(nsp__allocate_offline_task_t);
 	ret_value = build_task_node(task_pkt->data, len, task_pkt->cnt_nodes_, offline_task);
 	++offline_task->ato_task_id_;
+	log__save("motion_template", kLogLevel_Info, kLogTarget_Filesystem | kLogTarget_Stdout,
+		"successful allocate offline task. user_id=%lld, ato_id=%lld", offline_task->user_task_id_, offline_task->ato_task_id_);
 
 	if (offline_task) {
 		var__release_object_reference(offline_task);

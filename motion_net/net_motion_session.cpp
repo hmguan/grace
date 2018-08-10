@@ -1291,7 +1291,6 @@ namespace mn {
 
 		for (const auto &iter_node : task) {
 			nsp::proto::proto_offline_node_t task_node;
-			task_node.task_id_ = iter_node.task_id_;
 			task_node.dest_upl_.edge_id_ = iter_node.dest_upl_.edge_id_;
 			task_node.dest_upl_.percentage_ = iter_node.dest_upl_.percentage_;
 			task_node.dest_upl_.angle_ = iter_node.dest_upl_.angle_;
@@ -1306,7 +1305,6 @@ namespace mn {
 			}
 			for (const auto &iter_oper : iter_node.opers_) {
 				nsp::proto::proto_offline_operation_t task_oper;
-				task_oper.task_id_ = iter_oper.task_id_;
 				task_oper.code_ = iter_oper.code_;
 				task_oper.params0_ = iter_oper.params_[0];
 				task_oper.params1_ = iter_oper.params_[1];
