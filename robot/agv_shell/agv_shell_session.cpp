@@ -532,6 +532,7 @@ int agv_shell_session::on_post_log_type_list()
 	std::set<std::string> set_path_;
 	std::string strmodule_path = nsp::os::get_module_directory<char>() + POSIX__DIR_SYMBOL_STR;
 
+#ifdef _WIN32
 	//agvshell module log
 	set_path_.emplace(strmodule_path + "log" POSIX__DIR_SYMBOL_STR + nsp::os::get_module_filename<char>() + POSIX__DIR_SYMBOL_STR);
 
@@ -543,13 +544,13 @@ int agv_shell_session::on_post_log_type_list()
 		else{
 			strpath = "";
 		}
-#ifdef _WIN32
-		set_path_.emplace(strpath + CK_GetProcessRelatePath(ap->name_) + "log"POSIX__DIR_SYMBOL_STR + ap->process_name_ + ".exe"POSIX__DIR_SYMBOL_STR);
-#else
-		set_path_.emplace(strpath + CK_GetProcessRelatePath(ap->name_) + "log"POSIX__DIR_SYMBOL_STR + ap->process_name_ + POSIX__DIR_SYMBOL_STR);
-#endif
-	}
 
+		set_path_.emplace(strpath + CK_GetProcessRelatePath(ap->name_) + "log" POSIX__DIR_SYMBOL_STR + ap->process_name_ + ".exe" POSIX__DIR_SYMBOL_STR);
+	}
+#else
+	set_path_.emplace(strmodule_path + "log" POSIX__DIR_SYMBOL_STR);
+	set_path_.emplace("/gzrobot/log/");
+#endif
 	for (auto iter : set_path_ ){
 		nsp::toolkit::singleton<global_parameter>::instance()->run_progess_by_get_logtype(iter, log_types);
 	}
@@ -575,6 +576,7 @@ int agv_shell_session::on_post_log_info(const std::shared_ptr<nsp::proto::proto_
 	std::set<std::string> set_path;
 	set_path.emplace(module_path + "/log/");
 
+#ifdef _WIN32
 	std::string strpath = "";
 	for (auto & iter : global_parameter::agv_process_){
 		if ('.' == iter.name_.at(0)){
@@ -586,6 +588,9 @@ int agv_shell_session::on_post_log_info(const std::shared_ptr<nsp::proto::proto_
 
 		set_path.emplace(strpath + CK_GetProcessRelatePath(iter.name_) + "log/");
 	}
+#else
+	set_path.emplace("/gzrobot/log/");
+#endif
 	for (const auto &iter : set_path){
 		search_file(iter, start_time, end_time, [&](const std::string &path,const std::string &type)->void{
 			for (const auto & vec_iter : data->vct_log_type_){
@@ -662,7 +667,7 @@ void agv_shell_session::search_file(std::string strPath, std::string start_time,
 		loinfo("agv_shell") << " open dir error";
 		return;
 	}
-	while (ent = readdir(dirptr)) {
+	while ((ent = readdir(dirptr))) {
 		if (LOGS_CANCEL == this->logs_cancel_flag_) {
 			break;
 		}

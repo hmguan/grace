@@ -966,6 +966,7 @@ void global_parameter::run_progess_by_get_logtype(std::string&log_path, std::set
 #else
 	struct dirent *ent;
 	DIR *dirptr;
+	struct stat st;
 	loinfo("agv_shell") << "process path:" << log_path;
 
 	if ( !(dirptr = opendir(log_path.c_str())) ) {
@@ -974,6 +975,14 @@ void global_parameter::run_progess_by_get_logtype(std::string&log_path, std::set
 
 	while (NULL != (ent = readdir(dirptr))) {
 		if (0 == strcmp(ent->d_name, ".") || 0 == strcmp(ent->d_name, "..")) {
+			continue;
+		}
+		
+		std::string file_full_path = log_path + ent->d_name;
+		stat(file_full_path.c_str(), &st);
+		if (S_ISDIR(st.st_mode)){
+			file_full_path += "/";
+			run_progess_by_get_logtype(file_full_path, log_type);
 			continue;
 		}
 		
