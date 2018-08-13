@@ -133,14 +133,16 @@ static int receiver(unsigned char *cache_ptr) {
             continue;
         }
 
-        if (0 == rcvcb || rcvcb > MTU_OVERFLOW) {
+        if (rcvcb < sizeof(int) || rcvcb > MTU_OVERFLOW) {
+            log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout, 
+                    " private pool recv size large than MTU,rcvcb=%d", rcvcb);
             return -1;
         }
 
         // cache 布局:
         // [长度][数据]
-        bcopy(&rcvcb, cache_ptr, sizeof (int));
-        bcopy(rcvbuf, &cache_ptr[sizeof (rcvcb)], rcvcb);
+        memcpy(cache_ptr, &rcvcb, sizeof(rcvcb));
+        memcpy(&cache_ptr[sizeof (rcvcb)], rcvbuf, rcvcb);
         break;
     }
 

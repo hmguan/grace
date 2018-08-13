@@ -132,18 +132,18 @@ struct vcu_vehicle_misc_config {
 struct vcu_protocol_head {
     uint16_t id;
     uint8_t ver;
-    uint8_t seg; // 总共有多少个分段
-    uint32_t off; // 目标地址偏移
+    uint8_t seg;    /* total segment for this packet */
+    uint32_t off; /* target address byte offset */
     uint16_t len; // 不计包头的字节长度（即dat的字节长度）
     uint8_t dat[0];
-};
+};/* 10 bytes */
 
 struct vcu_common_command {
     uint16_t mask;
     int16_t x; // 线速度 m/s * 1000
     int16_t y; // 线速度 m/s * 1000
     int16_t angular_velocity; // 角速度 rad/s * 1000
-};
+}; /* 8 bytes */
 
 struct vcu_battery_protocol {
     uint16_t voltage; // 总电压 v * 100
@@ -152,7 +152,7 @@ struct vcu_battery_protocol {
     uint16_t capacity; // 电池剩余容量
     uint16_t cycle; // 电池循环充电次数(寿命标志) 
     uint16_t status; // 电池状态
-};
+}; /* 12 bytes */
 
 struct vcu_common_report {
     struct vcu_common_command command;
@@ -165,7 +165,7 @@ struct vcu_common_report {
     int32_t coordinate_x; // M核递推的坐标x
     int32_t coordinate_y; // M核递推的坐标y
     int16_t coordinate_angle; // M核递推的坐标角度
-};
+}; /* 58 bytes */ 
 
 ////////////////////////////////////        对象和功能结构定义部分     /////////////////////////////////////////////////////////////////////////////
 #define GZD_UDP_PORT                (0x5000)
@@ -437,7 +437,7 @@ int nspi_vcu_callback(const unsigned char *data, int cb) {
     unsigned char *bussiness;
     int bussiness_size;
 
-    // 接收到的包不足以填充通用包+业务包长度
+    /* the packet data length received but not enough to fill the (common packet length + bussiness packet length). */
     if (cb < (sizeof (struct vcu_protocol_head) + sizeof (struct vcu_common_report))) {
         log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout, "Invalid packet size:%u, offset:0", head->len);
         return -1;
@@ -448,7 +448,7 @@ int nspi_vcu_callback(const unsigned char *data, int cb) {
         return -1;
     }
 
-    // 根据协议偏移得到上报数据
+    /* parse the report data by protocol. */
     report = (struct vcu_common_report *) head->dat;
     bussiness = &head->dat[BUSSINESS_OFFSET];
 
@@ -974,17 +974,17 @@ int nspi_load_vehicle_misc_settings() {
 			if(0 == misc_node->object_type) {
 				memcpy(misc_node->object_data, t_object_data, 8);
 			} else if (misc_node->object_type > 0 && misc_node->object_type <= 8) {
-				uint64_t uint64_data = strtoull(t_object_data, NULL, 10);
+				uint64_t uint64_data = strtoull(t_object_data, NULL, sizeof(uint64_data));
 				memcpy(misc_node->object_data, &uint64_data, 8);
 			} else if (misc_node->object_type > 8 && misc_node->object_type <= 24) {
 				int64_t int64_data = strtoll(t_object_data, NULL, 10);
-				memcpy(misc_node->object_data, &int64_data, 8);
+				memcpy(misc_node->object_data, &int64_data, sizeof(int64_data));
 			} else if (misc_node->object_type == 36) {
 				float flo_data = strtof(t_object_data, NULL);
-				memcpy(misc_node->object_data, &flo_data, 8);
+				memcpy(misc_node->object_data, &flo_data, sizeof(flo_data));
 			} else if (misc_node->object_type == 40) {
 				double dou_data = strtod(t_object_data, NULL);
-				memcpy(misc_node->object_data, &dou_data, 8);
+				memcpy(misc_node->object_data, &dou_data, sizeof(dou_data));
 			}
         
             misc_node = (struct vcu_vehicle_misc_config*) ( (char*)misc_node + sizeof(struct vcu_vehicle_misc_config) );
