@@ -147,14 +147,19 @@ int var__set_offline_task(const char *data, int cb) {
 			"offline new task id equal to current."UINT64_STRFMT, offline_task->task_count_);
 		return -EINVAL;
 	}
-	offline_task->user_task_id_ = task_pkt->task_id_;
-	offline_task->task_count_ = task_pkt->cnt_nodes_;
-	offline_task->task_current_exec_index_ = 0;
 	len = cb - sizeof(nsp__allocate_offline_task_t);
 	ret_value = build_task_node(task_pkt->data, len, task_pkt->cnt_nodes_, offline_task);
-	++offline_task->ato_task_id_;
-	log__save("motion_template", kLogLevel_Info, kLogTarget_Filesystem | kLogTarget_Stdout,
-		"successful allocate offline task. user_id=%lld, ato_id=%lld", offline_task->user_task_id_, offline_task->ato_task_id_);
+	if (0 == ret_value) {
+		offline_task->user_task_id_ = task_pkt->task_id_;
+		offline_task->task_count_ = task_pkt->cnt_nodes_;
+		offline_task->task_current_exec_index_ = 0;
+		offline_task->track_status_.command_ = kStatusDescribe_Startup;
+		offline_task->track_status_.middle_ = kStatusDescribe_Running;
+		offline_task->track_status_.response_ = kStatusDescribe_Running;
+		++offline_task->ato_task_id_;
+		log__save("motion_template", kLogLevel_Info, kLogTarget_Filesystem | kLogTarget_Stdout,
+			"successful allocate offline task. user_id=%lld, ato_id=%lld", offline_task->user_task_id_, offline_task->ato_task_id_);
+	}
 
 	if (offline_task) {
 		var__release_object_reference(offline_task);
