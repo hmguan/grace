@@ -384,11 +384,29 @@ int nspi__on_common_compare_write(HTCPLINK link, const char *data, int cb) {
     return tcp_write(link, ack_common_compare_write.size_, &nsp__packet_maker, &ack_common_compare_write);
 }
 
+static int is_exist_offline_task() {
+	int ret_value = 0;
+	var_offline_task_t *offline_task = NULL;
+
+	offline_task = var__get_offline_task();
+	if (((offline_task->track_status_.response_ > kStatusDescribe_PendingFunction)
+		&& (offline_task->track_status_.response_ < kStatusDescribe_FinalFunction))
+		|| (offline_task->track_status_.middle_ != kStatusDescribe_Idle)
+		) {
+		ret_value = 1;
+	}
+	if (offline_task) {
+		var__release_object_reference(offline_task);
+	}
+
+	return ret_value;
+}
+
 static
 int nspi__on_allocate_navigation_task(HTCPLINK link, const char *data, int cb) {
     nsp__allocate_navigation_task_t *pkt_allocate_nav_task = (nsp__allocate_navigation_task_t *) data;
-    var__navigation_t *nav;
-    var__vehicle_t *veh;
+    var__navigation_t *nav = NULL;
+    var__vehicle_t *veh = NULL;
     nsp__allocate_navigation_task_ack_t ack_control_navigation_task;
 
     memcpy(&ack_control_navigation_task.head_, &pkt_allocate_nav_task->head_, sizeof ( pkt_allocate_nav_task->head_));
@@ -398,7 +416,13 @@ int nspi__on_allocate_navigation_task(HTCPLINK link, const char *data, int cb) {
     ack_control_navigation_task.head_.err_ = 0;
 
     do {
-        if (cb < sizeof(nsp__allocate_navigation_task_t)) {
+		if (is_exist_offline_task()) {
+			// 离线任务存在时，不允许新的导航任务下达 
+			ack_control_navigation_task.head_.err_ = -EBUSY;
+			break;
+		}
+
+		if (cb < sizeof(nsp__allocate_navigation_task_t)) {
             log__save("motion_template",  kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout, 
                 "invalid request size for nsp__allocate_navigation_task_t: %d", cb);
             ack_control_navigation_task.head_.err_ = -EINVAL;
@@ -499,7 +523,7 @@ int nspi__on_additional_navigation_trajectory(HTCPLINK link, const char *data, i
     trail_t *realloc_trajectory;
     int realloc_traj_cnt;
     uint32_t previous_traj_status;
-    
+
     memcpy(&ack_additional_navigation_trajectory, &pkt_additional_navigation_trajectory->head_,
             sizeof ( pkt_additional_navigation_trajectory->head_));
     ack_additional_navigation_trajectory.size_ = sizeof ( ack_additional_navigation_trajectory);
@@ -509,8 +533,13 @@ int nspi__on_additional_navigation_trajectory(HTCPLINK link, const char *data, i
     previous_traj_status = 0xFFFFFFFF;
 
     do {
-        nav = NULL;
+		if (is_exist_offline_task()) {
+			// 离线任务存在时，不允许添加新的导航边 
+			ack_additional_navigation_trajectory.err_ = -EBUSY;
+			break;
+		}
 
+		nav = NULL;
         if (cb < sizeof( nsp__additional_navigation_trajectory_t)) {
             log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout, 
                 "invlaid request size for nsp__additional_navigation_trajectory_t:%d", cb);
@@ -946,7 +975,7 @@ static
 int nspi__on_allocate_operation_task(HTCPLINK link, const char *data, int cb) {
     nsp__allocate_operation_task_t *pkt_allocate_op_task = (nsp__allocate_operation_task_t *) data;
     nsp__allocate_operation_task_ack_t ack_allocate_op_task;
-    var__operation_t *opt;
+    var__operation_t *opt = NULL;
 
     memcpy(&ack_allocate_op_task.head_, &pkt_allocate_op_task->head_, sizeof (nsp__packet_head_t));
     ack_allocate_op_task.head_.type_ = PKTTYPE_ALLOC_OPERATION_TASK_ACK;
@@ -954,9 +983,13 @@ int nspi__on_allocate_operation_task(HTCPLINK link, const char *data, int cb) {
     ack_allocate_op_task.head_.err_ = -1;
 
     do {
-        opt = NULL;
+		if (is_exist_offline_task()) {
+			// 离线任务存在时，不允许新的操作任务下达 
+			ack_allocate_op_task.head_.err_ = -EBUSY;
+			break;
+		}
 
-        if (cb < sizeof( nsp__allocate_operation_task_t)) {
+		if (cb < sizeof( nsp__allocate_operation_task_t)) {
             log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout, 
                 "invalid request size for ansp__allocate_operation_task_t:%d", cb);
             ack_allocate_op_task.head_.err_ = -EINVAL;
@@ -1426,7 +1459,7 @@ static int nspi__on_offline_navigation_task(var_offline_task_node_t *task_node, 
 			(nav->track_status_.middle_ != kStatusDescribe_Idle)
 			) {
 			log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
-				"failed to allocate navigation task,status response=%u, middle=%u", nav->track_status_.response_, nav->track_status_.middle_);
+				"failed to allocate offline navigation task,status response=%u, middle=%u", nav->track_status_.response_, nav->track_status_.middle_);
 			ret_value = -EBUSY;
 			break;
 		}
@@ -1451,10 +1484,10 @@ static int nspi__on_offline_navigation_task(var_offline_task_node_t *task_node, 
 			nav->user_task_id_ = nav_task_id_; // using the new task id
 			posix__atomic_inc(&nav->ato_task_id_); // atomic increase inner task id
 			log__save("motion_template", kLogLevel_Info, kLogTarget_Filesystem | kLogTarget_Stdout,
-				"successful allocate navigation task. user_id=%lld, ato_id=%lld", nav->user_task_id_, nav->ato_task_id_);
+				"successful allocate offline navigation task. user_id=%lld, ato_id=%lld", nav->user_task_id_, nav->ato_task_id_);
 		} else{
 			log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
-				"failed to allocate navigation task because insuffcient memory.");
+				"failed to allocate offline navigation task because insuffcient memory.");
 			ret_value = -ENOMEM;
 			break;
 		}
@@ -1483,9 +1516,6 @@ static int nspi__on_offline_next_step(HTCPLINK link, const char *data, int cb) {
 
 	offline_task = var__get_offline_task();
 	if (offline_task) {
-		if (offline_task->track_status_.command_ == kStatusDescribe_Idle) {
-			var__xchange_command_status(&offline_task->track_status_, kStatusDescribe_Startup, NULL);
-		}
 		if (offline_task->task_current_exec_index_ >= offline_task->task_count_) {
 			log__save("motion_template", kLogLevel_Error, kLogTarget_Filesystem | kLogTarget_Stdout,
 				"offline task can't exec next step, task_current_exec_index_:%u, count:%u",
