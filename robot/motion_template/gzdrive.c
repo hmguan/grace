@@ -975,16 +975,16 @@ int nspi_load_vehicle_misc_settings() {
 				memcpy(misc_node->object_data, t_object_data, 8);
 			} else if (misc_node->object_type > 0 && misc_node->object_type <= 8) {
 				uint64_t uint64_data = strtoull(t_object_data, NULL, 10);
-				memcpy(misc_node->object_data, &uint64_data, 8);
+				memcpy(misc_node->object_data, &uint64_data, sizeof(uint64_data));
 			} else if (misc_node->object_type > 8 && misc_node->object_type <= 24) {
 				int64_t int64_data = strtoll(t_object_data, NULL, 10);
-				memcpy(misc_node->object_data, &int64_data, 8);
+				memcpy(misc_node->object_data, &int64_data, sizeof(int64_data));
 			} else if (misc_node->object_type == 36) {
 				float flo_data = strtof(t_object_data, NULL);
-				memcpy(misc_node->object_data, &flo_data, 8);
+				memcpy(misc_node->object_data, &flo_data, sizeof(flo_data));
 			} else if (misc_node->object_type == 40) {
 				double dou_data = strtod(t_object_data, NULL);
-				memcpy(misc_node->object_data, &dou_data, 8);
+				memcpy(misc_node->object_data, &dou_data, sizeof(dou_data));
 			}
         
             misc_node = (struct vcu_vehicle_misc_config*) ( (char*)misc_node + sizeof(struct vcu_vehicle_misc_config) );
