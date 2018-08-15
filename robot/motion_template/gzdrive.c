@@ -974,8 +974,8 @@ int nspi_load_vehicle_misc_settings() {
 			if(0 == misc_node->object_type) {
 				memcpy(misc_node->object_data, t_object_data, 8);
 			} else if (misc_node->object_type > 0 && misc_node->object_type <= 8) {
-				uint64_t uint64_data = strtoull(t_object_data, NULL, sizeof(uint64_data));
-				memcpy(misc_node->object_data, &uint64_data, 8);
+				uint64_t uint64_data = strtoull(t_object_data, NULL, 10);
+				memcpy(misc_node->object_data, &uint64_data, sizeof(uint64_data));
 			} else if (misc_node->object_type > 8 && misc_node->object_type <= 24) {
 				int64_t int64_data = strtoll(t_object_data, NULL, 10);
 				memcpy(misc_node->object_data, &int64_data, sizeof(int64_data));
