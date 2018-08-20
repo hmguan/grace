@@ -25,6 +25,17 @@ Floyd::Floyd()
 
 Floyd::~Floyd()
 {
+	for (int i = 0; i < m_WopDistancesLength; i++)
+	{
+		delete[] m_WopDistances[i];
+	}
+	delete[] m_WopDistances;
+
+	for (int i = 0; i < m_WopPathsLength; i++)
+	{
+		delete[] m_WopPaths[i];
+	}
+	delete[] m_WopPaths;
 }
 
 // private
@@ -671,15 +682,13 @@ int Floyd::StartFolyd(const char* pFloydPath, FinishLevelCB FinishLevelCB, void*
 		if (iCount <= 2000){
 			try{
 				rfloyd_date = new FloydDate[iCount];
+				FloydDate * pori = rfloyd_date;
 				ptr = new char[size];
 				fread(ptr, size, 1, fp);
 				rfloyd_date = (FloydDate*)ptr;
-				if (rfloyd_date == NULL){
-					delete[] rfloyd_date;
-					return -1;
-				}
 				ReadFLoydData(rfloyd_date, iCount, m_WopDistances, m_WopPaths);
 				delete[] rfloyd_date;
+				delete[] pori;
 			}
 			catch (...){
 				loerror("path_search") << "new rFloydDate[] failed";
@@ -691,12 +700,14 @@ int Floyd::StartFolyd(const char* pFloydPath, FinishLevelCB FinishLevelCB, void*
 			for (int i = 0; i < inum; i++){
 				try{
 					rfloyd_date = new FloydDate[2000000];
+					FloydDate * pori = rfloyd_date;
 					ptr = new char[2000000 * sizeof(FloydDate)];
 					fread(ptr, 2000000 * sizeof(FloydDate), 1, fp);
 					rfloyd_date = (FloydDate*)ptr;
 					fseek(fp, 0, SEEK_CUR);
 					ReadFLoydData(rfloyd_date, 2000000, m_WopDistances, m_WopPaths);
 					delete[] rfloyd_date;
+					delete[] pori;
 				}
 				catch (...){
 					loerror("path_search") << "new rFloydDate[] or ptr failed";
@@ -704,11 +715,13 @@ int Floyd::StartFolyd(const char* pFloydPath, FinishLevelCB FinishLevelCB, void*
 			}
 			try{
 				rfloyd_date = new FloydDate[iover];
+				FloydDate * pori = rfloyd_date;
 				ptr = new char[iover * sizeof(FloydDate)];
 				fread(ptr, iover * sizeof(FloydDate), 1, fp);
 				rfloyd_date = (FloydDate*)ptr;
 				ReadFLoydData(rfloyd_date,iover, m_WopDistances, m_WopPaths);
 				delete[] rfloyd_date;
+				delete[] pori;
 			}
 			catch (...){
 				loerror("path_search") << "new rFloydDate[] or ptr failed";
@@ -939,7 +952,8 @@ int Floyd::GetPathByUpl( const PathSearch_Upl stStartUpl, const PathSearch_Upl s
 	PathSearch_UPL  best_endUpl;
 	// 遍历，找到最优的带wop的起始和结束upl
 	for( auto& startUpl : vctStartUpl ) {
-		for( auto& endUpl : vctEndUpl ) {
+		for( auto& endUpl : vctEndUpl ) {		
+			loinfo("path_search") << "startUpl " << startUpl.wop_id << "endUpl " << endUpl.wop_id;
 			if( GetPath( startUpl, endUpl, &tmp_path, &tmp_length, &tmp_distance ) < 0 ) {
 				//Releasepath( tmp_path );
 				break;
@@ -947,6 +961,7 @@ int Floyd::GetPathByUpl( const PathSearch_Upl stStartUpl, const PathSearch_Upl s
 			if (tmp_path){
 				Releasepath( tmp_path );
 			}
+			loinfo("path_search") << "startUpl " << startUpl.wop_id << "endUpl " << endUpl.wop_id << "dis" << tmp_distance;
 			tmp_path = nullptr;
 			if( tmp_distance + tmp_length*1 < min_distance ) {
 				min_distance = tmp_distance + tmp_length * 1;

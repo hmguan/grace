@@ -14,6 +14,12 @@ Dijkstra::Dijkstra()
 
 Dijkstra::~Dijkstra()
 {
+	for (int i = 0; i < m_WopDistancesLength; i++)
+	{
+		delete[] m_WopDistances[i];
+	}
+	delete[] m_WopDistances;
+
 }
 
 // private
