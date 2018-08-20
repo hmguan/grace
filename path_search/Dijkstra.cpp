@@ -119,7 +119,7 @@ int Dijkstra::SameWopPathSearch( const PathSearch_Upl stStartUpl, const PathSear
 				return -1;
 			}
 		}
-
+		return 0;
 	}
 	if (SameWopInsideSearch(stStartUpl, stEndUpl, iSameWopIndex, vctWopPath, fDistance) < 0){
 			if (SameWopOutsideSearch(stStartUpl, stEndUpl, iSameWopIndex, fDistanceStart, fDistanceEnd, vctWopPath, fDistance) < 0) {
